@@ -245,7 +245,7 @@ struct KimiMenu: View {
             HStack(spacing: 8) {
                 ActionButton(
                     title: "控制台",
-                    icon: "terminal",
+                    icon: "square.grid.2x2",
                     action: { NSWorkspace.shared.open(consoleURL) }
                 )
 
@@ -321,6 +321,9 @@ struct KimiMenu: View {
         }
         .onAppear {
             loadKimiVersion()
+            if model.key.isEmpty {
+                showSettings = true
+            }
         }
     }
 
@@ -874,16 +877,33 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var editingKey = ""
     @State private var isEditingKey = false
+    @State private var isHoveredCloseButton = false
+    @State private var isHoveredConsoleLink = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // 顶部标题
-            Text("设置")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.kimiTextPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
+            HStack(spacing: 12) {
+                Text("请先配置 KimiCode API Key")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.kimiTextPrimary)
+
+                Spacer()
+
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isHoveredCloseButton ? .kimiTextPrimary : .kimiTextSecondary)
+                        .frame(width: 24, height: 24)
+                        .background(isHoveredCloseButton ? Color.white.opacity(0.14) : Color.white.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .cursor(.pointingHand)
+                .onHover { isHoveredCloseButton = $0 }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
 
             // 优雅分割线
             Divider()
@@ -945,7 +965,24 @@ struct SettingsView: View {
                 .padding(.top, 16)
 
             // 底部操作按钮
-            HStack {
+            HStack(spacing: 12) {
+                Button(action: { NSWorkspace.shared.open(URL(string: "https://www.kimi.com/code/console")!) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 10))
+                        Text("去控制台获取")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(isHoveredConsoleLink ? .kimiTextPrimary : .kimiTextSecondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(isHoveredConsoleLink ? Color.white.opacity(0.14) : Color.white.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .cursor(.pointingHand)
+                .onHover { isHoveredConsoleLink = $0 }
+
                 Spacer()
 
                 if isEditingKey || model.key.isEmpty {
@@ -1039,6 +1076,7 @@ struct LoadingRing: View {
 
 struct ErrorMessageView: View {
     let message: String
+    @State private var isHoveredCopy = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -1063,8 +1101,10 @@ struct ErrorMessageView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(.kimiTextSecondary)
+            .foregroundStyle(isHoveredCopy ? .kimiTextPrimary : .kimiTextSecondary)
             .help("复制错误信息")
+            .cursor(.pointingHand)
+            .onHover { isHoveredCopy = $0 }
             .padding(.top, 2)
         }
         .padding(8)
