@@ -221,7 +221,7 @@ struct KimiMenu: View {
             }
 
             // 用量卡片
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 UsageCard(
                     title: "本周用量",
                     subtitle: nil,
@@ -230,17 +230,6 @@ struct KimiMenu: View {
                     color: .kimiBlue,
                     isLoading: model.isLoading
                 )
-
-                if let monthly = model.quota?.monthly {
-                    UsageCard(
-                        title: "本月用量",
-                        subtitle: nil,
-                        percentage: monthly.percentage,
-                        reset: monthly.timeUntilReset,
-                        color: .purple,
-                        isLoading: model.isLoading
-                    )
-                }
 
                 UsageCard(
                     title: "5小时用量",
@@ -313,7 +302,7 @@ struct KimiMenu: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .padding(16)
-        .frame(width: 420)
+        .frame(width: 340)
         .background(Color.kimiPanelBackground)
         .popover(isPresented: $showSettings, arrowEdge: .bottom) {
             SettingsView()
