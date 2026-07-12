@@ -15,8 +15,8 @@
 ## 运行展示
 
 <p align="center">
-  <img src="Assets/panel.gif" width="48%" alt="暗夜模式">
-  <img src="Assets/panel2.png" width="48%" alt="浅色模式">
+  <img src="Assets/panel.gif" width="400" height="430" alt="暗夜模式">
+  <img src="Assets/panel2.png" width="400" height="430" alt="浅色模式">
 </p>
 
 ## 功能特性
