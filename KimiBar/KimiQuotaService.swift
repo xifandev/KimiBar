@@ -19,6 +19,8 @@ struct QuotaDetail: Equatable {
 struct KimiQuota: Equatable {
     let weekly: QuotaDetail
     let fiveHour: QuotaDetail
+    let totalQuota: QuotaDetail
+    let membershipLevel: String?
 }
 
 final class KimiQuotaService {
@@ -102,8 +104,20 @@ final class KimiQuotaService {
                 let window: Window
                 let detail: Detail
             }
+            struct TotalQuota: Codable {
+                let limit: String?
+                let remaining: String?
+            }
+            struct User: Codable {
+                struct Membership: Codable {
+                    let level: String?
+                }
+                let membership: Membership?
+            }
             let usage: Usage?
             let limits: [Limit]?
+            let totalQuota: TotalQuota?
+            let user: User?
         }
 
         guard let resp = try? JSONDecoder().decode(Response.self, from: data) else {
@@ -127,7 +141,21 @@ final class KimiQuotaService {
             )
         }
 
-        return KimiQuota(weekly: weekly, fiveHour: fiveHour)
+        let totalQuota = makeDetail(
+            limit: resp.totalQuota?.limit,
+            used: nil,
+            remaining: resp.totalQuota?.remaining,
+            resetTime: nil
+        )
+
+        let membershipLevel = resp.user?.membership?.level
+
+        return KimiQuota(
+            weekly: weekly,
+            fiveHour: fiveHour,
+            totalQuota: totalQuota,
+            membershipLevel: membershipLevel
+        )
     }
 
     private func makeDetail(limit: String?, used: String?, remaining: String?, resetTime: String?) -> QuotaDetail {

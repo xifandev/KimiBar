@@ -2,8 +2,42 @@ import SwiftUI
 import AppKit
 import UserNotifications
 
+// MARK: - 主题
+
+enum AppTheme: String, CaseIterable, Identifiable {
+    case system
+    case dark
+    case light
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: return "跟随系统"
+        case .dark: return "月之暗面"
+        case .light: return "月之亮面"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .dark: return .dark
+        case .light: return .light
+        }
+    }
+}
+
+@MainActor
+final class ThemeManager: ObservableObject {
+    static let shared = ThemeManager()
+    @AppStorage("appTheme") var theme: AppTheme = .system
+}
+
 @main
 struct KimiBarApp: App {
+    @StateObject private var themeManager = ThemeManager.shared
+
     init() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
@@ -11,6 +45,7 @@ struct KimiBarApp: App {
     var body: some Scene {
         MenuBarExtra {
             KimiMenu()
+                .preferredColorScheme(themeManager.theme.colorScheme)
         } label: {
             KimiLabel()
         }
@@ -20,13 +55,50 @@ struct KimiBarApp: App {
 
 // MARK: - 配色
 
+private func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+    Color(NSColor(name: nil, dynamicProvider: { appearance in
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return isDark ? dark : light
+    }))
+}
+
 extension ShapeStyle where Self == Color {
-    static var kimiPanelBackground: Color { Color(red: 0.06, green: 0.08, blue: 0.13) }
-    static var kimiCardBackground: Color { Color(red: 0.11, green: 0.14, blue: 0.21) }
+    static var kimiPanelBackground: Color {
+        dynamicColor(
+            light: NSColor(red: 0.95, green: 0.95, blue: 0.97, alpha: 0.82),
+            dark: NSColor(red: 0.06, green: 0.08, blue: 0.13, alpha: 1.0)
+        )
+    }
+
+    static var kimiCardBackground: Color {
+        dynamicColor(
+            light: NSColor(white: 1.0, alpha: 0.62),
+            dark: NSColor(red: 0.11, green: 0.14, blue: 0.21, alpha: 1.0)
+        )
+    }
+
     static var kimiBlue: Color { Color(red: 0.23, green: 0.51, blue: 0.96) }
-    static var kimiTextPrimary: Color { .white }
-    static var kimiTextSecondary: Color { Color(white: 1.0, opacity: 0.55) }
-    static var kimiTextTertiary: Color { Color(white: 1.0, opacity: 0.40) }
+
+    static var kimiTextPrimary: Color {
+        dynamicColor(
+            light: NSColor(white: 0.12, alpha: 1.0),
+            dark: NSColor(white: 1.0, alpha: 1.0)
+        )
+    }
+
+    static var kimiTextSecondary: Color {
+        dynamicColor(
+            light: NSColor(white: 0.35, alpha: 1.0),
+            dark: NSColor(white: 1.0, alpha: 0.55)
+        )
+    }
+
+    static var kimiTextTertiary: Color {
+        dynamicColor(
+            light: NSColor(white: 0.50, alpha: 1.0),
+            dark: NSColor(white: 1.0, alpha: 0.40)
+        )
+    }
 }
 
 // MARK: - 菜单栏图标
@@ -60,6 +132,11 @@ private func percentageFont(for percentage: Int) -> Font {
 @MainActor
 enum MenuBarTextRenderer {
     static func image(weekly: Int, fiveHour: Int) -> NSImage {
+        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let textColor = isDark
+            ? Color(red: 0.886, green: 0.910, blue: 0.961)
+            : Color(white: 0.15)
+
         let content = VStack(alignment: .trailing, spacing: -1) {
             HStack(spacing: 2) {
                 Text("7D")
@@ -82,7 +159,7 @@ enum MenuBarTextRenderer {
                     .frame(width: 30, alignment: .trailing)
             }
         }
-        .foregroundStyle(Color(red: 0.886, green: 0.910, blue: 0.961))
+        .foregroundStyle(textColor)
         .frame(width: 48, height: 20, alignment: .trailing)
 
         let renderer = ImageRenderer(content: content)
@@ -185,6 +262,7 @@ struct KimiCodeLogo: View {
 
 struct KimiMenu: View {
     @StateObject private var model = KimiBarModel.shared
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showSettings = false
     @State private var showUpdateAlert = false
     @State private var isHoveredVersion = false
@@ -208,22 +286,32 @@ struct KimiMenu: View {
             }
 
             // 用量卡片
-            HStack(spacing: 12) {
-                UsageCard(
-                    title: "本周用量",
-                    subtitle: nil,
-                    percentage: model.quota?.weekly.percentage ?? 0,
-                    reset: model.quota?.weekly.timeUntilReset ?? "--",
-                    color: .kimiBlue,
-                    isLoading: model.isLoading
-                )
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    UsageCard(
+                        title: "本周用量",
+                        subtitle: nil,
+                        percentage: model.quota?.weekly.percentage ?? 0,
+                        reset: model.quota?.weekly.timeUntilReset ?? "--",
+                        color: .kimiBlue,
+                        isLoading: model.isLoading
+                    )
 
-                UsageCard(
-                    title: "5小时用量",
-                    subtitle: nil,
-                    percentage: model.quota?.fiveHour.percentage ?? 0,
-                    reset: model.quota?.fiveHour.timeUntilReset ?? "--",
-                    color: .orange,
+                    UsageCard(
+                        title: "5小时用量",
+                        subtitle: nil,
+                        percentage: model.quota?.fiveHour.percentage ?? 0,
+                        reset: model.quota?.fiveHour.timeUntilReset ?? "--",
+                        color: .orange,
+                        isLoading: model.isLoading
+                    )
+                }
+
+                CompactQuotaBar(
+                    title: "账号额度",
+                    used: model.quota?.totalQuota.used ?? 0,
+                    limit: model.quota?.totalQuota.limit ?? 0,
+                    color: .purple,
                     isLoading: model.isLoading
                 )
             }
@@ -232,7 +320,7 @@ struct KimiMenu: View {
             HStack(spacing: 8) {
                 ActionButton(
                     title: "控制台",
-                    icon: "square.grid.2x2",
+                    icon: "arrow.up.forward.square",
                     action: { NSWorkspace.shared.open(consoleURL) }
                 )
 
@@ -269,7 +357,7 @@ struct KimiMenu: View {
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(isHoveredVersion ? Color.white.opacity(0.08) : Color.clear)
+                .background(isHoveredVersion ? Color.kimiTextPrimary.opacity(0.08) : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .contentShape(Rectangle())
                 .onHover { isHoveredVersion = $0 }
@@ -302,10 +390,10 @@ struct KimiMenu: View {
                         .foregroundStyle(.kimiTextTertiary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Color.white.opacity(0.06))
+                        .background(Color.kimiTextPrimary.opacity(0.06))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                .stroke(Color.kimiTextPrimary.opacity(0.15), lineWidth: 1)
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
@@ -316,7 +404,14 @@ struct KimiMenu: View {
         }
         .padding(16)
         .frame(width: 340)
-        .background(Color.kimiPanelBackground)
+        .background(
+            ZStack {
+                Color.kimiPanelBackground
+                if colorScheme == .light {
+                    Color.clear.background(.ultraThinMaterial)
+                }
+            }
+        )
         .popover(isPresented: $showSettings, arrowEdge: .bottom) {
             SettingsView()
         }
@@ -365,6 +460,18 @@ struct KimiMenu: View {
         try? task.run()
     }
 
+    private func formatMembershipLevel(_ level: String) -> String {
+        switch level.uppercased() {
+        case "LEVEL_FREE": return "免费版"
+        case "LEVEL_BASIC": return "基础版"
+        case "LEVEL_INTERMEDIATE": return "进阶版"
+        case "LEVEL_ADVANCED": return "高级版"
+        default:
+            let trimmed = level.uppercased().replacingOccurrences(of: "LEVEL_", with: "")
+            return trimmed.isEmpty ? "未知" : trimmed
+        }
+    }
+
     private func formatKimiVersion(_ version: String) -> String {
         guard version != "未检测到" else { return "未检测到" }
         let trimmed = version.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -402,7 +509,7 @@ struct UsageCard: View {
                         .foregroundStyle(.kimiTextTertiary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.white.opacity(0.08))
+                        .background(Color.kimiTextPrimary.opacity(0.08))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
@@ -431,7 +538,7 @@ struct UsageCard: View {
                 ZStack(alignment: .leading) {
                     Capsule()
                         .frame(height: 4)
-                        .foregroundStyle(Color.white.opacity(0.10))
+                        .foregroundStyle(Color.kimiTextPrimary.opacity(0.10))
 
                     Capsule()
                         .frame(width: proxy.size.width * CGFloat(min(percentage, 100)) / 100, height: 4)
@@ -450,6 +557,55 @@ struct UsageCard: View {
         .frame(maxWidth: .infinity)
         .background(Color.kimiCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+// MARK: - 紧凑额度横条
+
+struct CompactQuotaBar: View {
+    let title: String
+    let used: Int
+    let limit: Int
+    let color: Color
+    let isLoading: Bool
+
+    var body: some View {
+        let percentage = limit > 0 ? Int(Double(used) / Double(limit) * 100) : 0
+
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.kimiTextPrimary)
+                .frame(width: 56, alignment: .leading)
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .frame(height: 4)
+                        .foregroundStyle(Color.kimiTextPrimary.opacity(0.10))
+
+                    Capsule()
+                        .frame(width: proxy.size.width * CGFloat(min(percentage, 100)) / 100, height: 4)
+                        .foregroundStyle(color)
+                        .shadow(color: color.opacity(0.4), radius: 2, x: 0, y: 1)
+                }
+            }
+            .frame(height: 4)
+
+            if isLoading {
+                LoadingRing()
+                    .frame(width: 12, height: 12)
+            } else {
+                Text("\(percentage)%")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.kimiTextSecondary)
+                    .frame(width: 32, alignment: .trailing)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.kimiCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -474,7 +630,7 @@ struct ActionButton: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .foregroundStyle(disabled ? .kimiTextTertiary : (isHovered ? .kimiTextPrimary : .kimiTextSecondary))
-            .background(isHovered && !disabled ? Color.white.opacity(0.10) : Color.white.opacity(0.06))
+            .background(isHovered && !disabled ? Color.kimiTextPrimary.opacity(0.10) : Color.kimiTextPrimary.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
@@ -551,16 +707,16 @@ struct CommunityButton: View {
                 Text("社区版")
                     .font(.system(size: 13, weight: .medium))
             }
-            .foregroundStyle(isHovered ? .kimiTextPrimary : Color(white: 1.0, opacity: 0.65))
+            .foregroundStyle(isHovered ? .kimiTextPrimary : .kimiTextSecondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isHovered ? Color.white.opacity(0.12) : Color.clear)
+                    .fill(isHovered ? Color.kimiTextPrimary.opacity(0.12) : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(isHovered ? Color.white.opacity(0.40) : Color.white.opacity(0.20), lineWidth: 1)
+                    .stroke(isHovered ? Color.kimiTextPrimary.opacity(0.40) : Color.kimiTextPrimary.opacity(0.20), lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -679,23 +835,6 @@ func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {
     return .orderedSame
 }
 
-func versionBySubtractingOnePatch(_ version: String) -> String {
-    let normalized = normalizeVersion(version)
-    var parts = normalized.split(separator: ".").compactMap { Int($0) }
-    guard !parts.isEmpty else { return normalized }
-
-    for i in (0..<parts.count).reversed() {
-        if parts[i] > 0 {
-            parts[i] -= 1
-            break
-        } else {
-            parts[i] = 9
-        }
-    }
-
-    return parts.map { String($0) }.joined(separator: ".")
-}
-
 // MARK: - 更新弹窗
 
 struct UpdateAlertView: View {
@@ -704,6 +843,7 @@ struct UpdateAlertView: View {
     let releaseNotes: String
     let onDismiss: () -> Void
     let onInstall: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -742,7 +882,7 @@ struct UpdateAlertView: View {
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .center)
-                .background(Color.white.opacity(0.06))
+                .background(Color.kimiTextPrimary.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
             }
             .padding(.horizontal, 24)
@@ -753,29 +893,32 @@ struct UpdateAlertView: View {
             HStack(spacing: 12) {
                 Button(action: onDismiss) {
                     Text("稍后再说")
-                        .font(.system(size: 13))
                         .frame(minWidth: 80)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(KimiButtonStyle(isProminent: false))
                 .cursor(.pointingHand)
 
                 Spacer()
 
                 Button(action: onInstall) {
                     Text("安装更新")
-                        .font(.system(size: 13))
                         .frame(minWidth: 80)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(KimiButtonStyle(isProminent: true))
                 .cursor(.pointingHand)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 20)
         }
         .frame(width: 520)
-        .background(Color.kimiPanelBackground)
+        .background(
+            ZStack {
+                Color.kimiPanelBackground
+                if colorScheme == .light {
+                    Color.clear.background(.ultraThinMaterial)
+                }
+            }
+        )
     }
 }
 
@@ -783,13 +926,15 @@ struct UpdateAlertView: View {
 
 struct SettingsView: View {
     @StateObject private var model = KimiBarModel.shared
+    @StateObject private var themeManager = ThemeManager.shared
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @State private var editingKey = ""
     @State private var isEditingKey = false
     @State private var isHoveredCloseButton = false
     @State private var isHoveredConsoleLink = false
-    @State private var quotaIntervalText = "1"
-    @State private var updateIntervalText = "10"
+    @State private var quotaIntervalText = "5"
+    @State private var updateIntervalText = "30"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -806,7 +951,7 @@ struct SettingsView: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(isHoveredCloseButton ? .kimiTextPrimary : .kimiTextSecondary)
                         .frame(width: 24, height: 24)
-                        .background(isHoveredCloseButton ? Color.white.opacity(0.14) : Color.white.opacity(0.08))
+                        .background(isHoveredCloseButton ? Color.kimiTextPrimary.opacity(0.14) : Color.kimiTextPrimary.opacity(0.08))
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -818,7 +963,7 @@ struct SettingsView: View {
 
             // 优雅分割线
             Divider()
-                .background(Color.white.opacity(0.10))
+                .background(Color.kimiTextPrimary.opacity(0.10))
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
 
@@ -846,7 +991,7 @@ struct SettingsView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.white.opacity(0.08))
+                            .background(Color.kimiTextPrimary.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
 
                         Button(action: {
@@ -854,10 +999,8 @@ struct SettingsView: View {
                             isEditingKey = true
                         }) {
                             Text("修改")
-                                .font(.system(size: 13))
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        .buttonStyle(KimiButtonStyle(isProminent: false))
                         .cursor(.pointingHand)
                     }
                     .frame(maxWidth: .infinity)
@@ -869,28 +1012,40 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 20)
 
+            // 界面配色
+            VStack(alignment: .leading, spacing: 8) {
+                Text("界面配色")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.kimiTextSecondary)
+
+                Picker("", selection: $themeManager.theme) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+
             // 刷新与检查设置
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 IntervalSettingRow(
                     title: "额度刷新间隔",
-                    subtitle: "最小 1 分钟",
-                    value: $quotaIntervalText,
-                    minValue: 1
+                    value: $quotaIntervalText
                 )
 
                 IntervalSettingRow(
                     title: "检查更新间隔",
-                    subtitle: "最小 10 分钟",
-                    value: $updateIntervalText,
-                    minValue: 10
+                    value: $updateIntervalText
                 )
             }
             .padding(.horizontal, 20)
-            .padding(.top, 4)
+            .padding(.top, 12)
 
             // 底部分割线
             Divider()
-                .background(Color.white.opacity(0.10))
+                .background(Color.kimiTextPrimary.opacity(0.10))
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
 
@@ -906,7 +1061,7 @@ struct SettingsView: View {
                     .foregroundStyle(isHoveredConsoleLink ? .kimiTextPrimary : .kimiTextSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(isHoveredConsoleLink ? Color.white.opacity(0.14) : Color.white.opacity(0.08))
+                    .background(isHoveredConsoleLink ? Color.kimiTextPrimary.opacity(0.14) : Color.kimiTextPrimary.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
@@ -918,19 +1073,15 @@ struct SettingsView: View {
                 if isEditingKey || model.key.isEmpty {
                     Button(action: saveKey) {
                         Text("保存")
-                            .font(.system(size: 13, weight: .medium))
                     }
                     .disabled(editingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .cursor(.pointingHand)
+                    .buttonStyle(KimiButtonStyle(isProminent: true))
+                    .cursor(editingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .arrow : .pointingHand)
                 } else {
                     Button(action: { dismiss() }) {
                         Text("完成")
-                            .font(.system(size: 13, weight: .medium))
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .buttonStyle(KimiButtonStyle(isProminent: true))
                     .cursor(.pointingHand)
                 }
             }
@@ -938,7 +1089,14 @@ struct SettingsView: View {
             .padding(.vertical, 12)
         }
         .frame(width: 320)
-        .background(Color.kimiPanelBackground)
+        .background(
+            ZStack {
+                Color.kimiPanelBackground
+                if colorScheme == .light {
+                    Color.clear.background(.ultraThinMaterial)
+                }
+            }
+        )
         .onAppear {
             editingKey = model.key
             isEditingKey = model.key.isEmpty
@@ -953,8 +1111,8 @@ struct SettingsView: View {
     }
 
     private func commitIntervals() {
-        let quota = Int(quotaIntervalText) ?? 1
-        let update = Int(updateIntervalText) ?? 10
+        let quota = Int(quotaIntervalText) ?? 5
+        let update = Int(updateIntervalText) ?? 30
         model.quotaRefreshInterval = Double(max(1, quota))
         model.updateCheckInterval = Double(max(10, update))
         quotaIntervalText = intervalText(from: model.quotaRefreshInterval)
@@ -990,28 +1148,20 @@ struct SettingsView: View {
 
 struct IntervalSettingRow: View {
     let title: String
-    let subtitle: String
     @Binding var value: String
-    let minValue: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.kimiTextPrimary)
+
+            Spacer()
+
             HStack(spacing: 6) {
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.kimiTextPrimary)
-
-                Spacer()
-
-                Text(subtitle)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.kimiTextTertiary)
-            }
-
-            HStack(spacing: 8) {
                 TextField("分钟", text: $value)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 80)
+                    .frame(width: 70)
                     .onChange(of: value) { _, newValue in
                         let filtered = newValue.filter { $0.isNumber }
                         if filtered != newValue {
@@ -1024,6 +1174,27 @@ struct IntervalSettingRow: View {
                     .foregroundStyle(.kimiTextSecondary)
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.kimiTextPrimary.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct KimiButtonStyle: ButtonStyle {
+    let isProminent: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isProminent ? Color.kimiBlue : Color.kimiTextPrimary.opacity(0.12))
+            )
+            .opacity(configuration.isPressed ? 0.75 : 1.0)
     }
 }
 
@@ -1051,7 +1222,7 @@ struct LoadingRing: View {
             .stroke(
                 style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
             )
-            .foregroundStyle(.white.opacity(0.7))
+            .foregroundStyle(Color.kimiTextPrimary.opacity(0.7))
             .rotationEffect(.degrees(rotation))
             .onAppear {
                 withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
@@ -1125,8 +1296,8 @@ final class KimiBarModel: ObservableObject {
     static let shared = KimiBarModel()
 
     @AppStorage("kimiApiKey") var key = ""
-    @AppStorage("quotaRefreshInterval") var quotaRefreshInterval: Double = 1
-    @AppStorage("updateCheckInterval") var updateCheckInterval: Double = 10
+    @AppStorage("quotaRefreshInterval") var quotaRefreshInterval: Double = 5
+    @AppStorage("updateCheckInterval") var updateCheckInterval: Double = 30
 
     @Published var text = "-- · --"
     @Published var quota: KimiQuota?
@@ -1138,10 +1309,6 @@ final class KimiBarModel: ObservableObject {
     @Published var pendingUpdateVersion: String?
     @Published var pendingReleaseNotes: String?
     @Published var updateErrorMessage: String?
-
-    // MARK: 临时调试开关
-    private let debugForceUpdateAvailable = false
-    private let debugPretendOlderVersion = false
 
     private let service = KimiQuotaService()
     private var timer: Timer?
@@ -1229,18 +1396,6 @@ final class KimiBarModel: ObservableObject {
             updateErrorMessage = nil
         }
 
-        // 临时调试：强制模拟检测到新版本
-        if debugForceUpdateAvailable {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            await MainActor.run {
-                pendingUpdateVersion = "0.99.0"
-                pendingReleaseNotes = "1. 修复了若干已知问题。\n2. 优化了性能。\n3. 新增实验性功能。"
-                isCheckingUpdate = false
-                sendUpdateNotification(version: "0.99.0")
-            }
-            return
-        }
-
         async let currentVersionTask = detectKimiCLIVersion()
         async let changelogTask = fetchLatestChineseChangelog()
 
@@ -1262,9 +1417,7 @@ final class KimiBarModel: ObservableObject {
             }
 
             let latest = normalizeVersion(changelog.version)
-            let currentNormalized = debugPretendOlderVersion
-                ? versionBySubtractingOnePatch(current)
-                : normalizeVersion(current)
+            let currentNormalized = normalizeVersion(current)
 
             if compareVersions(currentNormalized, latest) == .orderedAscending {
                 // 避免重复通知：只有首次发现该版本时才发送通知
