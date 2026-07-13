@@ -251,18 +251,18 @@ enum MenuBarTextRenderer {
     private static func singleLineImage(weekly: Int, fiveHour: Int) -> NSImage {
         let content = HStack(spacing: 4) {
             Text("Kimi")
-                .font(.system(size: 10, weight: .bold, design: .default))
+                .font(.system(size: 12, weight: .bold, design: .default))
             Text(percentageText(weekly))
-                .font(percentageFont(for: weekly))
+                .font(.system(size: 12, weight: .medium, design: .default))
                 .monospacedDigit()
             Text("·")
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
             Text(percentageText(fiveHour))
-                .font(percentageFont(for: fiveHour))
+                .font(.system(size: 12, weight: .medium, design: .default))
                 .monospacedDigit()
         }
         .foregroundStyle(textColor)
-        .frame(width: 110, height: 20, alignment: .trailing)
+        .frame(width: 120, height: 20, alignment: .trailing)
 
         return render(content)
     }
