@@ -1336,10 +1336,10 @@ struct ActionButton: View {
             VStack(spacing: 6) {
                 if let textIcon {
                     Text(textIcon)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                        .frame(width: 18, height: 18, alignment: .center)
+                        .minimumScaleFactor(0.8)
+                        .frame(width: 34, height: 18, alignment: .center)
                         .multilineTextAlignment(.center)
                 } else if let icon {
                     Image(systemName: icon)
@@ -2346,8 +2346,6 @@ struct BasicSettingsView: View {
                         HStack(spacing: 12) {
                             Text("实时预览")
                                 .font(.system(size: 13))
-
-                            Spacer()
 
                             if let quota = model.quota {
                                 Image(nsImage: MenuBarTextRenderer.image(
