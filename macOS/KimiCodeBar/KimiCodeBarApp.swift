@@ -2171,30 +2171,75 @@ struct SettingsRootView: View {
     }
 }
 
+// MARK: - 设置页面顶部卡片
+
+struct SettingsHeroCard: View {
+    let icon: String
+    let title: String
+    let description: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 36, weight: .light))
+                .foregroundStyle(.white)
+                .frame(width: 64, height: 64)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.kimiBlue)
+                        .shadow(color: Color.kimiBlue.opacity(0.35), radius: 10, x: 0, y: 4)
+                )
+
+            Text(title)
+                .font(.system(size: 20, weight: .bold))
+
+            Text(description)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 420)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(Color.kimiCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+}
+
 // MARK: - 通用设置
 
 struct GeneralSettingsView: View {
     @StateObject private var themeManager = ThemeManager.shared
 
     var body: some View {
-        Form {
-            Section {
-                Picker("", selection: $themeManager.theme) {
-                    ForEach(AppTheme.allCases) { theme in
-                        Text(theme.displayName).tag(theme)
+        ScrollView {
+            VStack(spacing: 20) {
+                SettingsHeroCard(
+                    icon: "gear",
+                    title: "通用",
+                    description: "管理 KimiCodeBar 的整体外观与通用行为。"
+                )
+
+                Form {
+                    Section {
+                        Picker("", selection: $themeManager.theme) {
+                            ForEach(AppTheme.allCases) { theme in
+                                Text(theme.displayName).tag(theme)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    } header: {
+                        Text("外观")
+                    } footer: {
+                        Text("更改外观后，菜单栏图标与面板会跟随系统或强制使用指定主题。")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("外观")
-            } footer: {
-                Text("更改外观后，菜单栏图标与面板会跟随系统或强制使用指定主题。")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                .formStyle(.grouped)
             }
+            .padding()
         }
-        .formStyle(.grouped)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .navigationTitle(SettingsPane.general.title)
     }
 }
@@ -2216,10 +2261,18 @@ struct APISettingsView: View {
     @FocusState private var focusedField: APISettingField?
 
     var body: some View {
-        Form {
-            Section {
-                HStack(spacing: 10) {
-                    if isEditingKey {
+        ScrollView {
+            VStack(spacing: 20) {
+                SettingsHeroCard(
+                    icon: "key",
+                    title: "API",
+                    description: "配置 Kimi API Key 与自动刷新间隔。"
+                )
+
+                Form {
+                    Section {
+                        HStack(spacing: 10) {
+                            if isEditingKey {
                         SecureField("sk-kimi-...", text: $editingKey)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: .infinity)
@@ -2322,9 +2375,11 @@ struct APISettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
+                }
+                .formStyle(.grouped)
+            }
+            .padding()
         }
-        .formStyle(.grouped)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .navigationTitle(SettingsPane.api.title)
         .onAppear {
             editingKey = model.key
@@ -2383,9 +2438,17 @@ struct MenuBarSettingsView: View {
     @StateObject private var model = KimiCodeBarModel.shared
 
     var body: some View {
-        Form {
-            Section {
-                Picker("显示方案", selection: $model.menuBarDisplayScheme) {
+        ScrollView {
+            VStack(spacing: 20) {
+                SettingsHeroCard(
+                    icon: "menubar.rectangle",
+                    title: "菜单栏",
+                    description: "自定义菜单栏图标的显示方案与实时预览。"
+                )
+
+                Form {
+                    Section {
+                        Picker("显示方案", selection: $model.menuBarDisplayScheme) {
                     ForEach(MenuBarDisplayScheme.allCases) { scheme in
                         Text(scheme.displayName).tag(scheme)
                     }
@@ -2421,9 +2484,11 @@ struct MenuBarSettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
+                }
+                .formStyle(.grouped)
+            }
+            .padding()
         }
-        .formStyle(.grouped)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .navigationTitle(SettingsPane.menuBar.title)
         .onAppear {
             model.refresh()
@@ -2437,33 +2502,43 @@ struct AboutSettingsView: View {
     @StateObject private var model = KimiCodeBarModel.shared
 
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 20) {
+                SettingsHeroCard(
+                    icon: "info.circle",
+                    title: "关于",
+                    description: "KimiCodeBar 版本信息与支持链接。"
+                )
 
-            AnimatedKimiCodeLogo(width: 64, isAnimating: true)
+                VStack(spacing: 16) {
+                    AnimatedKimiCodeLogo(width: 64, isAnimating: true)
 
-            Text("KimiCodeBar")
-                .font(.system(size: 22, weight: .bold))
+                    Text("KimiCodeBar")
+                        .font(.system(size: 22, weight: .bold))
 
-            Text("版本 \(appVersion())")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                    Text("版本 \(appVersion())")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
 
-            if model.kimiVersion != "检测中…" && model.kimiVersion != "未检测到" {
-                Text("KimiCode CLI \(formatKimiVersion(model.kimiVersion))")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    if model.kimiVersion != "检测中…" && model.kimiVersion != "未检测到" {
+                        Text("KimiCode CLI \(formatKimiVersion(model.kimiVersion))")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 12) {
+                        LinkRow(title: "GitHub", icon: "arrow.up.right", url: URL(string: "https://github.com/xifandev/KimiCodeBar")!)
+                        LinkRow(title: "反馈问题", icon: "exclamationmark.bubble", url: URL(string: "https://github.com/xifandev/KimiCodeBar/issues")!)
+                    }
+                    .padding(.top, 8)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+                .background(Color.kimiCardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-
-            HStack(spacing: 12) {
-                LinkRow(title: "GitHub", icon: "arrow.up.right", url: URL(string: "https://github.com/xifandev/KimiCodeBar")!)
-                LinkRow(title: "反馈问题", icon: "exclamationmark.bubble", url: URL(string: "https://github.com/xifandev/KimiCodeBar/issues")!)
-            }
-            .padding(.top, 8)
-
-            Spacer()
+            .padding()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle(SettingsPane.about.title)
     }
 }
