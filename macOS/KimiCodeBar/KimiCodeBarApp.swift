@@ -573,13 +573,6 @@ struct KimiMenu: View {
                             await model.restartKimiServer()
                             await MainActor.run { isLoadingKimiServer = false }
                         }
-                    },
-                    onRefresh: {
-                        isLoadingKimiServer = true
-                        Task {
-                            await model.refreshKimiServerState()
-                            await MainActor.run { isLoadingKimiServer = false }
-                        }
                     }
                 )
             }
@@ -1092,12 +1085,10 @@ struct KimiServerCard: View {
     let onStart: () -> Void
     let onStop: () -> Void
     let onRestart: () -> Void
-    let onRefresh: () -> Void
 
     @State private var isHoveredOpenWeb = false
     @State private var isHoveredToggle = false
     @State private var isHoveredRestart = false
-    @State private var isHoveredRefresh = false
 
     private var statusColor: Color {
         switch state.status {
@@ -1110,16 +1101,16 @@ struct KimiServerCard: View {
         }
     }
 
-    private var statusLabel: String {
+    private var statusText: String {
         switch state.status {
         case .running:
-            return "Kimi Web 运行中"
+            return "运行中"
         case .stopped:
-            return "Kimi Web 已停止"
+            return "已停止"
         case .error:
-            return "Kimi Web 异常"
+            return "异常"
         case .unknown:
-            return "Kimi Web 检测中…"
+            return "检测中"
         }
     }
 
@@ -1134,9 +1125,17 @@ struct KimiServerCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Text(statusLabel)
-                    .font(.system(size: 13, weight: .medium))
+                Text("Kimi Web")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.kimiTextPrimary)
+
+                Text(statusText)
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(statusColor)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(statusColor.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
 
                 Spacer()
 
@@ -1147,16 +1146,16 @@ struct KimiServerCard: View {
                 }
             }
 
-            VStack(spacing: 8) {
+            HStack(spacing: 8) {
                 Button(action: onOpenWeb) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Image(systemName: "globe")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
 
-                        Text("打开网页")
+                        Text("打开")
                             .font(.system(size: 13, weight: .medium))
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(width: 130)
                     .padding(.vertical, 10)
                     .foregroundStyle(.white)
                     .background(isHoveredOpenWeb ? Color.kimiBlue.opacity(0.85) : Color.kimiBlue)
@@ -1167,28 +1166,19 @@ struct KimiServerCard: View {
                 .cursor(isLoading || !isRunning ? .arrow : .pointingHand)
                 .onHover { isHoveredOpenWeb = $0 }
 
-                HStack(spacing: 8) {
-                    serverActionButton(
-                        title: toggleTitle,
-                        isHovered: $isHoveredToggle,
-                        action: isRunning ? onStop : onStart,
-                        disabled: isLoading
-                    )
+                serverActionButton(
+                    title: toggleTitle,
+                    isHovered: $isHoveredToggle,
+                    action: isRunning ? onStop : onStart,
+                    disabled: isLoading
+                )
 
-                    serverActionButton(
-                        title: "重启",
-                        isHovered: $isHoveredRestart,
-                        action: onRestart,
-                        disabled: isLoading
-                    )
-
-                    serverActionButton(
-                        title: "刷新",
-                        isHovered: $isHoveredRefresh,
-                        action: onRefresh,
-                        disabled: isLoading
-                    )
-                }
+                serverActionButton(
+                    title: "重启",
+                    isHovered: $isHoveredRestart,
+                    action: onRestart,
+                    disabled: isLoading
+                )
             }
         }
         .padding(12)
