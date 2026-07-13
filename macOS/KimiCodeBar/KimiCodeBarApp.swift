@@ -1337,6 +1337,8 @@ struct ActionButton: View {
                 if let textIcon {
                     Text(textIcon)
                         .font(.system(size: 13, weight: .bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                         .frame(width: 18, height: 18, alignment: .center)
                         .multilineTextAlignment(.center)
                 } else if let icon {
@@ -2206,10 +2208,11 @@ struct BasicSettingsView: View {
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .fixedSize()
+                            .labelsHidden()
 
                             Spacer()
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     } header: {
                         Text("外观")
                     } footer: {
@@ -2277,48 +2280,46 @@ struct BasicSettingsView: View {
                     Section {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text("额度刷新间隔")
-                                .frame(maxWidth: .infinity, alignment: .leading)
 
-                            HStack(spacing: 6) {
-                                TextField("分钟", text: $quotaIntervalText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 70)
-                                    .focused($focusedField, equals: .quotaInterval)
-                                    .onChange(of: quotaIntervalText) { _, newValue in
-                                        let filtered = newValue.filter { $0.isNumber }
-                                        if filtered != newValue {
-                                            quotaIntervalText = filtered
-                                        }
+                            Spacer()
+
+                            TextField("", text: $quotaIntervalText)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 70)
+                                .focused($focusedField, equals: .quotaInterval)
+                                .onChange(of: quotaIntervalText) { _, newValue in
+                                    let filtered = newValue.filter { $0.isNumber }
+                                    if filtered != newValue {
+                                        quotaIntervalText = filtered
                                     }
+                                }
 
-                                Text("分钟")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .fixedSize()
+                            Text("分钟")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 24, alignment: .leading)
                         }
 
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text("检查更新间隔")
-                                .frame(maxWidth: .infinity, alignment: .leading)
 
-                            HStack(spacing: 6) {
-                                TextField("分钟", text: $updateIntervalText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(width: 70)
-                                    .focused($focusedField, equals: .updateInterval)
-                                    .onChange(of: updateIntervalText) { _, newValue in
-                                        let filtered = newValue.filter { $0.isNumber }
-                                        if filtered != newValue {
-                                            updateIntervalText = filtered
-                                        }
+                            Spacer()
+
+                            TextField("", text: $updateIntervalText)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 70)
+                                .focused($focusedField, equals: .updateInterval)
+                                .onChange(of: updateIntervalText) { _, newValue in
+                                    let filtered = newValue.filter { $0.isNumber }
+                                    if filtered != newValue {
+                                        updateIntervalText = filtered
                                     }
+                                }
 
-                                Text("分钟")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .fixedSize()
+                            Text("分钟")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 24, alignment: .leading)
                         }
                     } header: {
                         Text("自动刷新")
@@ -2336,10 +2337,11 @@ struct BasicSettingsView: View {
                                 }
                             }
                             .pickerStyle(.segmented)
-                            .fixedSize()
+                            .labelsHidden()
 
                             Spacer()
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                         HStack(spacing: 12) {
                             Text("实时预览")
