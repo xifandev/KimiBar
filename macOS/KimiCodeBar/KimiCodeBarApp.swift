@@ -21,6 +21,22 @@ enum AppTheme: String, CaseIterable, Identifiable {
         }
     }
 
+    var subtitle: String {
+        switch self {
+        case .system: return "自动切换明暗"
+        case .dark: return "深色外观"
+        case .light: return "浅色外观"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .system: return "circle.lefthalf.filled"
+        case .dark: return "moon.fill"
+        case .light: return "sun.max.fill"
+        }
+    }
+
     var colorScheme: ColorScheme? {
         switch self {
         case .system: return nil
@@ -2701,11 +2717,14 @@ enum APISettingField: Hashable {
     case updateInterval
 }
 
-// MARK: - 登录方式选择卡片
+// MARK: - 设置选项卡片
 
 /// 卡片式单选：图标 + 标题 + 副标题，选中态蓝色描边 + 对勾。
-struct LoginMethodCard: View {
-    let method: LoginMethod
+/// 用于登录方式、外观主题等互斥选项的选择。
+struct SettingsOptionCard: View {
+    let title: String
+    let subtitle: String
+    let iconName: String
     let isSelected: Bool
     let action: () -> Void
 
@@ -2714,17 +2733,17 @@ struct LoginMethodCard: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: method.iconName)
+                Image(systemName: iconName)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(isSelected ? .kimiBlue : .kimiTextSecondary)
                     .frame(width: 24, alignment: .center)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(method.displayName)
+                    Text(title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.kimiTextPrimary)
 
-                    Text(method.subtitle)
+                    Text(subtitle)
                         .font(.system(size: 11))
                         .foregroundStyle(.kimiTextSecondary)
                 }
@@ -3066,8 +3085,10 @@ struct BasicSettingsView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 10) {
                             ForEach(LoginMethod.allCases) { method in
-                                LoginMethodCard(
-                                    method: method,
+                                SettingsOptionCard(
+                                    title: method.displayName,
+                                    subtitle: method.subtitle,
+                                    iconName: method.iconName,
                                     isSelected: model.loginMethod == method
                                 ) {
                                     model.loginMethod = method
@@ -3088,24 +3109,22 @@ struct BasicSettingsView: View {
                 }
 
                 // 外观主题
-                HStack(alignment: .center, spacing: 16) {
-                    Text("外观主题")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.kimiTextPrimary)
-
-                    Spacer()
-
-                    Picker("", selection: $themeManager.theme) {
+                SettingsCard(title: "外观主题") {
+                    HStack(spacing: 10) {
                         ForEach(AppTheme.allCases) { theme in
-                            Text(theme.displayName).tag(theme)
+                            SettingsOptionCard(
+                                title: theme.displayName,
+                                subtitle: theme.subtitle,
+                                iconName: theme.iconName,
+                                isSelected: themeManager.theme == theme
+                            ) {
+                                themeManager.theme = theme
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 180)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 13)
 
                 // 启动
                 SettingsCard {
@@ -3355,12 +3374,24 @@ struct SkillsSettingsView: View {
         HStack(spacing: 0) {
             // 左侧技能列表
             VStack(alignment: .leading, spacing: 0) {
-                Text("技能管理")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundStyle(.kimiTextPrimary)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 36)
-                    .padding(.bottom, 12)
+                HStack(spacing: 8) {
+                    Text("技能管理")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.kimiTextPrimary)
+
+                    if !isLoading && !skills.isEmpty {
+                        Text("\(skills.count)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.kimiTextTertiary)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Color.kimiTextPrimary.opacity(0.08))
+                            .clipShape(Capsule())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 36)
+                .padding(.bottom, 12)
 
                 if isLoading {
                     Spacer()
@@ -3376,16 +3407,25 @@ struct SkillsSettingsView: View {
                     Spacer()
                 } else if skills.isEmpty {
                     Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "puzzlepiece.extension.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.kimiTextTertiary)
-                        Text("暂无已安装技能")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.kimiTextSecondary)
-                        Text("技能包通常位于 ~/.kimi-code/skills/")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.kimiTextTertiary)
+                    VStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.kimiTextPrimary.opacity(0.06))
+                                .frame(width: 56, height: 56)
+
+                            Image(systemName: "puzzlepiece.extension")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundStyle(.kimiTextTertiary)
+                        }
+
+                        VStack(spacing: 4) {
+                            Text("暂无已安装技能")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.kimiTextSecondary)
+                            Text("技能包通常位于 ~/.kimi-code/skills/")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.kimiTextTertiary)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     Spacer()
@@ -3411,7 +3451,7 @@ struct SkillsSettingsView: View {
                     }
                 }
             }
-            .frame(width: 240)
+            .frame(width: 250)
             .background(Color.kimiPanelBackground)
 
             // 右侧预览区
@@ -3429,63 +3469,19 @@ struct SkillsSettingsView: View {
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let skill = displayedSkill {
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(skill.name)
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(.kimiTextPrimary)
-
-                                if !skill.version.isEmpty {
-                                    Text("版本 \(skill.version)")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(.kimiTextSecondary)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.kimiTextPrimary.opacity(0.08))
-                                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                                }
-                            }
-
-                            Spacer()
-
-                            Button(action: { revealSkillInFinder(skill) }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "folder")
-                                        .font(.system(size: 11, weight: .medium))
-                                    Text("在 Finder 中显示")
-                                        .font(.system(size: 11, weight: .medium))
-                                }
-                                .foregroundStyle(isHoveredFinder ? .kimiTextPrimary : .kimiTextSecondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(isHoveredFinder ? Color.kimiTextPrimary.opacity(0.14) : Color.kimiTextPrimary.opacity(0.08))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
-                            .cursor(.pointingHand)
-                            .onHover { isHoveredFinder = $0 }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 36)
-                        .padding(.bottom, 16)
-
-                        ScrollView {
-                            Text(skill.content)
-                                .font(.system(size: 12, design: .monospaced))
-                                .foregroundStyle(.kimiTextSecondary)
-                                .lineSpacing(3)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 20)
-                                .textSelection(.enabled)
-                        }
-                    }
+                    skillPreview(skill)
                 } else {
-                    VStack(spacing: 8) {
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.kimiTextTertiary)
+                    VStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.kimiTextPrimary.opacity(0.06))
+                                .frame(width: 56, height: 56)
+
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundStyle(.kimiTextTertiary)
+                        }
+
                         Text("选择左侧技能以预览内容")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.kimiTextSecondary)
@@ -3497,6 +3493,93 @@ struct SkillsSettingsView: View {
         .onAppear {
             loadAndSelect()
         }
+    }
+
+    /// 单个技能的预览：顶部信息卡片 + 正文内容卡片
+    private func skillPreview(_ skill: SkillInfo) -> some View {
+        VStack(spacing: 14) {
+            // 信息卡片
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.kimiBlue.opacity(0.14))
+                        .frame(width: 48, height: 48)
+
+                    Image(systemName: "puzzlepiece.extension")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.kimiBlue)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(skill.name)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.kimiTextPrimary)
+
+                        if !skill.version.isEmpty {
+                            Text("v\(skill.version)")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.kimiBlue)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.kimiBlue.opacity(0.12))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                    }
+
+                    if !skill.description.isEmpty {
+                        Text(skill.description)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.kimiTextSecondary)
+                            .lineLimit(1)
+                    }
+
+                    Text(skill.path)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.kimiTextTertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer(minLength: 8)
+
+                Button(action: { revealSkillInFinder(skill) }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 11, weight: .medium))
+                        Text("在 Finder 中显示")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(isHoveredFinder ? .kimiTextPrimary : .kimiTextSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(isHoveredFinder ? Color.kimiTextPrimary.opacity(0.14) : Color.kimiTextPrimary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .cursor(.pointingHand)
+                .onHover { isHoveredFinder = $0 }
+            }
+            .padding(16)
+            .background(Color.kimiCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // 正文卡片
+            ScrollView {
+                Text(skill.content)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.kimiTextSecondary)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .textSelection(.enabled)
+            }
+            .background(Color.kimiCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 16)
     }
 
     private func loadAndSelect() {
@@ -3544,10 +3627,16 @@ private struct SkillListItem: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "puzzlepiece.extension")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(isSelected ? .white : .kimiBlue)
-                .frame(width: 24, alignment: .center)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.white.opacity(0.22) : Color.kimiBlue.opacity(0.12))
+                    .frame(width: 32, height: 32)
+
+                Image(systemName: "puzzlepiece.extension")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isSelected ? .white : .kimiBlue)
+            }
+            .frame(width: 32, height: 32)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
