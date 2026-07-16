@@ -591,6 +591,7 @@ struct KimiMenu: View {
     @State private var isHoveredUpdateError = false
     @State private var isMenuVisible = false
     @State private var kimiServerOperation: KimiServerOperation = .none
+    @State private var isKimiServerRestartHintDismissed = false
 
     private let consoleURL = URL(string: "https://www.kimi.com/code/console")!
     private let githubURL = URL(string: "https://github.com/xifandev/KimiCodeBar")!
@@ -636,6 +637,24 @@ struct KimiMenu: View {
                     wallet: model.quota?.boosterWallet,
                     isLoading: model.isLoading
                 )
+
+                if model.kimiServerNeedsRestart && !isKimiServerRestartHintDismissed && kimiServerOperation == .none {
+                    KimiServerRestartHint(
+                        runningVersion: model.kimiServerState.version,
+                        installedVersion: model.kimiVersion,
+                        onRestart: {
+                            isKimiServerRestartHintDismissed = true
+                            kimiServerOperation = .restarting
+                            Task {
+                                await model.restartKimiServer()
+                                await MainActor.run { kimiServerOperation = .none }
+                            }
+                        },
+                        onDismiss: {
+                            isKimiServerRestartHintDismissed = true
+                        }
+                    )
+                }
 
                 KimiServerCard(
                     state: model.kimiServerState,
@@ -789,6 +808,7 @@ struct KimiMenu: View {
         .background(WindowVisibilityDetector(isVisible: $isMenuVisible))
         .onChange(of: isMenuVisible) { _, isVisible in
             if isVisible {
+                isKimiServerRestartHintDismissed = false
                 Task { await model.refreshKimiServerState() }
             }
         }
@@ -1173,6 +1193,63 @@ struct BoosterWalletCard: View {
         return formatCurrency(wallet.monthlyChargeLimitYuan, currency: wallet.currency)
     }
  }
+
+// MARK: - Kimi Web 重启提示
+
+struct KimiServerRestartHint: View {
+    let runningVersion: String
+    let installedVersion: String
+    let onRestart: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var isHoveredRestart = false
+    @State private var isHoveredDismiss = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.orange)
+
+            Text("Kimi Web 运行版本 \(formatKimiVersion(runningVersion)) 低于已安装版本 \(formatKimiVersion(installedVersion))，建议重启服务。")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.kimiTextPrimary)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 8)
+
+            Button(action: onRestart) {
+                Text("立即重启")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(isHoveredRestart ? .white : .white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(isHoveredRestart ? Color.orange.opacity(0.85) : Color.orange)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .cursor(.pointingHand)
+            .onHover { isHoveredRestart = $0 }
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isHoveredDismiss ? .kimiTextPrimary : .kimiTextSecondary)
+                    .frame(width: 22, height: 22)
+                    .background(isHoveredDismiss ? Color.kimiTextPrimary.opacity(0.10) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .cursor(.pointingHand)
+            .onHover { isHoveredDismiss = $0 }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.orange.opacity(0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
 
 // MARK: - Kimi Web 卡片
 
@@ -2965,6 +3042,17 @@ final class KimiCodeBarModel: ObservableObject {
     var hasCachedKimiUpdate: Bool {
         guard !cachedKimiLatestVersion.isEmpty, kimiVersion != "未检测到", kimiVersion != "检测中…" else { return false }
         return compareVersions(normalizeVersion(kimiVersion), normalizeVersion(cachedKimiLatestVersion)) == .orderedAscending
+    }
+
+    var kimiServerNeedsRestart: Bool {
+        guard kimiServerState.status == .running,
+              !kimiServerState.version.isEmpty,
+              kimiServerState.version != "未检测到",
+              !kimiVersion.isEmpty,
+              kimiVersion != "未检测到",
+              kimiVersion != "检测中…"
+        else { return false }
+        return compareVersions(normalizeVersion(kimiServerState.version), normalizeVersion(kimiVersion)) == .orderedAscending
     }
 
     private let service = KimiCodeBarQuotaService()
