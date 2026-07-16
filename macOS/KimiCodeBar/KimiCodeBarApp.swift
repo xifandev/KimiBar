@@ -2243,11 +2243,167 @@ final class SettingsWindowManager {
     }
 }
 
+// MARK: - 技能管理
+
+struct SkillInfo: Identifiable {
+    let id: String
+    let name: String
+    let directoryName: String
+    let description: String
+    let version: String
+    let content: String
+    let path: String
+}
+
+private func skillsDirectoryPath() -> String {
+    let home = FileManager.default.homeDirectoryForCurrentUser.path
+    return "\(home)/.kimi-code/skills"
+}
+
+private func loadSkills() -> [SkillInfo] {
+    let dir = skillsDirectoryPath()
+    guard FileManager.default.fileExists(atPath: dir) else { return [] }
+
+    do {
+        let items = try FileManager.default.contentsOfDirectory(atPath: dir)
+        let directories = items
+            .map { "\(dir)/\($0)" }
+            .filter { FileManager.default.fileExists(atPath: $0) && isDirectory($0) }
+            .sorted()
+
+        return directories.compactMap { parseSkill(at: $0) }
+    } catch {
+        return []
+    }
+}
+
+private func isDirectory(_ path: String) -> Bool {
+    var isDir: ObjCBool = false
+    FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+    return isDir.boolValue
+}
+
+private func parseSkill(at directoryPath: String) -> SkillInfo? {
+    let skillFile = "\(directoryPath)/SKILL.md"
+    guard FileManager.default.fileExists(atPath: skillFile) else { return nil }
+
+    guard let data = FileManager.default.contents(atPath: skillFile),
+          let content = String(data: data, encoding: .utf8) else { return nil }
+
+    let directoryName = URL(fileURLWithPath: directoryPath).lastPathComponent
+    var name = directoryName
+    var description = ""
+    var version = ""
+
+    let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.hasPrefix("---") {
+        if let endRange = trimmed.range(of: "---", range: trimmed.index(trimmed.startIndex, offsetBy: 3)..<trimmed.endIndex) {
+            let frontMatter = String(trimmed[trimmed.index(trimmed.startIndex, offsetBy: 3)..<endRange.lowerBound])
+            name = parseFrontMatterValue(frontMatter, key: "name") ?? directoryName
+            description = parseFrontMatterValue(frontMatter, key: "description") ?? ""
+            version = parseNestedFrontMatterValue(frontMatter, outerKey: "metadata", innerKey: "version") ?? ""
+        }
+    }
+
+    return SkillInfo(
+        id: directoryName,
+        name: name,
+        directoryName: directoryName,
+        description: description,
+        version: version,
+        content: content,
+        path: skillFile
+    )
+}
+
+private func parseFrontMatterValue(_ frontMatter: String, key: String) -> String? {
+    let lines = frontMatter.components(separatedBy: .newlines)
+    var foundKey = false
+    var rawValues: [String] = []
+
+    for line in lines {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("#") { continue }
+
+        if foundKey {
+            if trimmed.hasPrefix("-") {
+                rawValues.append(trimmed.dropFirst(1).trimmingCharacters(in: .whitespaces))
+                continue
+            }
+            if trimmed.isEmpty || trimmed.contains(":") {
+                break
+            }
+            rawValues.append(line)
+            continue
+        }
+
+        if trimmed.hasPrefix("\(key):") {
+            let remainder = trimmed.dropFirst(key.count + 1).trimmingCharacters(in: .whitespaces)
+            if remainder == "|" {
+                foundKey = true
+            } else {
+                return remainder.trimmingCharacters(in: .whitespaces)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+        }
+    }
+
+    guard !rawValues.isEmpty else { return nil }
+    return dedented(rawValues).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func dedented(_ lines: [String]) -> [String] {
+    let nonEmpty = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+    guard !nonEmpty.isEmpty else { return lines }
+
+    let leadingSpaces = nonEmpty.compactMap { line -> Int in
+        var count = 0
+        for char in line {
+            if char == " " { count += 1 } else { break }
+        }
+        return count
+    }
+
+    let minSpaces = leadingSpaces.min() ?? 0
+    return lines.map { line in
+        guard line.count >= minSpaces else { return line }
+        return String(line.dropFirst(minSpaces))
+    }
+}
+
+private func parseNestedFrontMatterValue(_ frontMatter: String, outerKey: String, innerKey: String) -> String? {
+    let lines = frontMatter.components(separatedBy: .newlines)
+    var insideOuter = false
+
+    for line in lines {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("#") { continue }
+
+        if trimmed.hasPrefix("\(outerKey):") {
+            insideOuter = true
+            continue
+        }
+
+        if insideOuter {
+            if trimmed.hasPrefix("\(innerKey):") {
+                let value = trimmed.dropFirst(innerKey.count + 1).trimmingCharacters(in: .whitespaces)
+                return value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+            if trimmed.contains(":") && !trimmed.hasPrefix("-") && !trimmed.hasPrefix(" ") {
+                break
+            }
+        }
+    }
+
+    return nil
+}
+
 // MARK: - 设置根视图
 
 enum SettingsPane: String, CaseIterable, Identifiable {
     case basic
     case archive
+    case skills
     case about
 
     var id: String { rawValue }
@@ -2256,6 +2412,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         switch self {
         case .basic: return "基本设置"
         case .archive: return "自动归档"
+        case .skills: return "技能管理"
         case .about: return "关于"
         }
     }
@@ -2264,6 +2421,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         switch self {
         case .basic: return "gear"
         case .archive: return "archivebox"
+        case .skills: return "puzzlepiece.extension"
         case .about: return "info.circle"
         }
     }
@@ -2298,6 +2456,8 @@ struct SettingsRootView: View {
                 BasicSettingsView()
             case .archive:
                 ArchiveSettingsView()
+            case .skills:
+                SkillsSettingsView()
             case .about:
                 AboutSettingsView()
             }
@@ -2784,6 +2944,270 @@ struct AboutSettingsView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(Color.kimiPanelBackground)
+    }
+}
+
+// MARK: - 技能管理设置
+
+struct SkillsSettingsView: View {
+    @State private var skills: [SkillInfo] = []
+    @State private var selectedSkill: SkillInfo?
+    @State private var displayedSkill: SkillInfo?
+    @State private var isLoading = true
+    @State private var isLoadingPreview = false
+    @State private var isHoveredFinder = false
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // 左侧技能列表
+            VStack(alignment: .leading, spacing: 0) {
+                Text("技能管理")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(.kimiTextPrimary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 36)
+                    .padding(.bottom, 12)
+
+                if isLoading {
+                    Spacer()
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.8)
+                        Text("正在加载技能…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.kimiTextSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    Spacer()
+                } else if skills.isEmpty {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "puzzlepiece.extension.fill")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.kimiTextTertiary)
+                        Text("暂无已安装技能")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.kimiTextSecondary)
+                        Text("技能包通常位于 ~/.kimi-code/skills/")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.kimiTextTertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    Spacer()
+                } else {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 8) {
+                                ForEach(skills) { skill in
+                                    SkillListItem(
+                                        skill: skill,
+                                        isSelected: selectedSkill?.id == skill.id
+                                    ) {
+                                        selectSkill(skill)
+                                        withAnimation {
+                                            proxy.scrollTo(skill.id, anchor: .center)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .frame(width: 240)
+            .background(Color.kimiPanelBackground)
+
+            // 右侧预览区
+            ZStack {
+                Color.kimiPanelBackground
+
+                if isLoadingPreview {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .scaleEffect(0.8)
+                        Text("正在加载内容…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.kimiTextSecondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let skill = displayedSkill {
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(skill.name)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.kimiTextPrimary)
+
+                                if !skill.version.isEmpty {
+                                    Text("版本 \(skill.version)")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(.kimiTextSecondary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.kimiTextPrimary.opacity(0.08))
+                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                                }
+                            }
+
+                            Spacer()
+
+                            Button(action: { revealSkillInFinder(skill) }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "folder")
+                                        .font(.system(size: 11, weight: .medium))
+                                    Text("在 Finder 中显示")
+                                        .font(.system(size: 11, weight: .medium))
+                                }
+                                .foregroundStyle(isHoveredFinder ? .kimiTextPrimary : .kimiTextSecondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(isHoveredFinder ? Color.kimiTextPrimary.opacity(0.14) : Color.kimiTextPrimary.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                            .cursor(.pointingHand)
+                            .onHover { isHoveredFinder = $0 }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 36)
+                        .padding(.bottom, 16)
+
+                        ScrollView {
+                            Text(skill.content)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(.kimiTextSecondary)
+                                .lineSpacing(3)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 20)
+                                .textSelection(.enabled)
+                        }
+                    }
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.system(size: 32))
+                            .foregroundStyle(.kimiTextTertiary)
+                        Text("选择左侧技能以预览内容")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.kimiTextSecondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .onAppear {
+            loadAndSelect()
+        }
+    }
+
+    private func loadAndSelect() {
+        // 文件读取放后台线程，避免 onAppear 时同步 I/O 卡住设置窗口
+        Task {
+            let loaded = await Task.detached(priority: .userInitiated) {
+                loadSkills()
+            }.value
+            skills = loaded
+            isLoading = false
+            if displayedSkill == nil, let first = loaded.first {
+                selectSkill(first)
+            }
+        }
+    }
+
+    /// 切换选中技能。
+    /// 预览区的大段可选中文本渲染开销较大，直接同步切换会卡住主线程一帧，
+    /// 这里先展示转圈、延迟一小段时间再替换内容，让界面看起来是「加载中」而不是「卡死」。
+    private func selectSkill(_ skill: SkillInfo) {
+        guard skill.id != selectedSkill?.id else { return }
+        selectedSkill = skill
+        isLoadingPreview = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            // 快速连点时只有最后一次选择生效
+            guard selectedSkill?.id == skill.id else { return }
+            displayedSkill = skill
+            isLoadingPreview = false
+        }
+    }
+
+    private func revealSkillInFinder(_ skill: SkillInfo) {
+        let url = URL(fileURLWithPath: skill.path)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+}
+
+private struct SkillListItem: View {
+    let skill: SkillInfo
+    let isSelected: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "puzzlepiece.extension")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(isSelected ? .white : .kimiBlue)
+                .frame(width: 24, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(skill.name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(isSelected ? .white : .kimiTextPrimary)
+
+                    if !skill.version.isEmpty {
+                        Text(skill.version)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(isSelected ? .white.opacity(0.85) : .kimiTextTertiary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(
+                                (isSelected ? Color.white.opacity(0.25) : Color.kimiTextPrimary.opacity(0.08))
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                }
+
+                if !skill.description.isEmpty {
+                    Text(skill.description)
+                        .font(.system(size: 11))
+                        .foregroundStyle(isSelected ? .white.opacity(0.85) : .kimiTextSecondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(isSelected ? .white.opacity(0.85) : .kimiTextTertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(backgroundColor)
+        )
+        .contentShape(Rectangle())
+        .cursor(.pointingHand)
+        .onHover { isHovered = $0 }
+        .onTapGesture(perform: action)
+    }
+
+    private var backgroundColor: Color {
+        if isSelected {
+            return .kimiBlue
+        } else if isHovered {
+            return Color.kimiTextPrimary.opacity(0.08)
+        } else {
+            return Color.kimiCardBackground
+        }
     }
 }
 
