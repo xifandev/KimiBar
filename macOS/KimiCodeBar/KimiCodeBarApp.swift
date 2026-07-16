@@ -3115,7 +3115,6 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     private func detectKimiServerState() async -> KimiServerState {
-        let version = await detectKimiCLIVersion()
         let psResult = await runKimiCommand(arguments: ["server", "ps"])
 
         if psResult.exitCode == 0 {
@@ -3123,6 +3122,7 @@ final class KimiCodeBarModel: ObservableObject {
                 .components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty && !$0.hasPrefix("ID") }
+            let version = await detectKimiServerVersion(port: 58627)
             return KimiServerState(
                 status: .running,
                 version: version,
@@ -3133,10 +3133,36 @@ final class KimiCodeBarModel: ObservableObject {
             let errorMsg = psResult.output.isEmpty ? "服务未运行" : psResult.output
             return KimiServerState(
                 status: .stopped,
-                version: version,
+                version: "未检测到",
                 port: 58627,
                 connections: 0
             )
+        }
+    }
+
+    private func detectKimiServerVersion(port: Int = 58627) async -> String {
+        guard let url = URL(string: "http://127.0.0.1:\(port)/api/v1/meta") else {
+            return "未检测到"
+        }
+
+        struct MetaResponse: Decodable {
+            struct MetaData: Decodable {
+                let server_version: String
+            }
+            let code: Int
+            let data: MetaData
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                return "未检测到"
+            }
+            let meta = try JSONDecoder().decode(MetaResponse.self, from: data)
+            let version = meta.data.server_version.trimmingCharacters(in: .whitespacesAndNewlines)
+            return version.isEmpty ? "未检测到" : version
+        } catch {
+            return "未检测到"
         }
     }
 
