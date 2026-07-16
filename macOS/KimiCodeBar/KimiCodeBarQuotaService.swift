@@ -45,8 +45,10 @@ final class KimiCodeBarQuotaService {
         return f
     }()
 
-    func fetchQuota(key: String) async -> Result<KimiQuota, QuotaError> {
-        guard key.hasPrefix("sk-kimi-") else {
+    /// 查询配额。token 可以是 API Key（sk-kimi- 前缀）或 OAuth access token，
+    /// 两者均以同样的 `Authorization: Bearer` 头携带，服务端不做区分。
+    func fetchQuota(token: String) async -> Result<KimiQuota, QuotaError> {
+        guard !token.isEmpty else {
             return .failure(.invalidKeyFormat)
         }
 
@@ -54,7 +56,7 @@ final class KimiCodeBarQuotaService {
             return .failure(.invalidURL)
         }
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 30
 
         do {
@@ -77,8 +79,8 @@ final class KimiCodeBarQuotaService {
         }
     }
 
-    func fetchDisplayText(key: String) async -> String {
-        let result = await fetchQuota(key: key)
+    func fetchDisplayText(token: String) async -> String {
+        let result = await fetchQuota(token: token)
         switch result {
         case .success(let quota):
             return "周\(quota.weekly.percentage)% 5h \(quota.fiveHour.percentage)%"

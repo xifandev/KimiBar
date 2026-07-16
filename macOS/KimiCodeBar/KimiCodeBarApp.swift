@@ -732,7 +732,7 @@ struct KimiMenu: View {
                     title: "刷新",
                     icon: "arrow.clockwise",
                     action: { model.refreshAll() },
-                    disabled: model.key.isEmpty || model.isLoading
+                    disabled: !model.hasCredential || model.isLoading
                 )
 
                 ActionButton(
@@ -880,7 +880,7 @@ struct KimiMenu: View {
         }
         .onAppear {
             model.checkCachedKimiUpdate()
-            if model.key.isEmpty {
+            if !model.hasCredential {
                 SettingsWindowManager.shared.show()
             } else if model.pendingUpdateVersion != nil {
                 showUpdateAlert = true
@@ -904,7 +904,7 @@ struct KimiMenu: View {
         .onChange(of: isMenuVisible) { _, visible in
             if visible {
                 model.checkCachedKimiUpdate()
-                if model.key.isEmpty {
+                if !model.hasCredential {
                     SettingsWindowManager.shared.show()
                 } else if model.pendingUpdateVersion != nil {
                     showUpdateAlert = true
@@ -2599,6 +2599,236 @@ enum APISettingField: Hashable {
     case updateInterval
 }
 
+// MARK: - OAuth 授权登录区域
+
+/// 基本设置中「授权登录」方式对应的凭证管理区域。
+/// 三个状态：未授权（去授权按钮）→ 授权中（展示 user_code 轮询）→ 已授权（状态 + 退出）。
+struct OAuthLoginSection: View {
+    @StateObject private var model = KimiCodeBarModel.shared
+
+    @State private var isHoveredStartLogin = false
+    @State private var isHoveredLogout = false
+    @State private var isHoveredCancel = false
+    @State private var isHoveredCopyCode = false
+    @State private var isHoveredReopen = false
+    @State private var isCodeCopied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if model.oauthLoginInProgress, let auth = model.oauthDeviceAuth {
+                authorizingContent(auth)
+            } else if let token = model.oauthToken {
+                authorizedContent(token)
+            } else {
+                loginContent
+            }
+
+            if let error = model.oauthLoginError {
+                SettingsCardDivider()
+                ErrorMessageView(message: error)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            }
+
+            if let error = model.errorMessage {
+                SettingsCardDivider()
+                ErrorMessageView(message: error)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            }
+        }
+    }
+
+    // MARK: 未授权
+
+    private var loginContent: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(.kimiTextTertiary)
+                .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("未授权")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.kimiTextPrimary)
+
+                Text("通过浏览器跳转 Kimi 账号完成授权")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.kimiTextSecondary)
+            }
+
+            Spacer()
+
+            Button(action: { model.startOAuthLogin() }) {
+                ZStack {
+                    Text("去授权")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                        .opacity(model.oauthLoginInProgress ? 0 : 1)
+
+                    if model.oauthLoginInProgress {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.6)
+                            .frame(width: 16, height: 16)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 7)
+                .background(model.oauthLoginInProgress ? Color.kimiBlue.opacity(0.6) : (isHoveredStartLogin ? Color.kimiBlue.opacity(0.85) : Color.kimiBlue))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .disabled(model.oauthLoginInProgress)
+            .cursor(model.oauthLoginInProgress ? .arrow : .pointingHand)
+            .onHover { isHoveredStartLogin = $0 }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    // MARK: 授权中
+
+    private func authorizingContent(_ auth: KimiDeviceAuthorization) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 状态行
+            HStack(spacing: 10) {
+                LoadingRing()
+                    .frame(width: 16, height: 16)
+
+                Text("等待浏览器授权…")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.kimiTextPrimary)
+
+                Spacer()
+
+                Button(action: { model.cancelOAuthLogin() }) {
+                    Text("取消")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(isHoveredCancel ? .kimiTextPrimary : .kimiTextSecondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(isHoveredCancel ? Color.kimiTextPrimary.opacity(0.14) : Color.kimiTextPrimary.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .cursor(.pointingHand)
+                .onHover { isHoveredCancel = $0 }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+
+            SettingsCardDivider()
+
+            // 授权码行
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("授权码")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.kimiTextSecondary)
+
+                    Text(auth.userCode)
+                        .font(.system(size: 20, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.kimiTextPrimary)
+                        .textSelection(.enabled)
+                }
+
+                Spacer()
+
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(auth.userCode, forType: .string)
+                    isCodeCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        isCodeCopied = false
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: isCodeCopied ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 11, weight: .medium))
+                        Text(isCodeCopied ? "已复制" : "复制")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(isHoveredCopyCode ? .kimiTextPrimary : .kimiTextSecondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(isHoveredCopyCode ? Color.kimiTextPrimary.opacity(0.14) : Color.kimiTextPrimary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .cursor(.pointingHand)
+                .onHover { isHoveredCopyCode = $0 }
+
+                if let urlString = auth.displayURL, let url = URL(string: urlString) {
+                    Button(action: { NSWorkspace.shared.open(url) }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "safari")
+                                .font(.system(size: 11, weight: .medium))
+                            Text("打开授权页")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundStyle(isHoveredReopen ? .white : .white.opacity(0.9))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(isHoveredReopen ? Color.kimiBlue.opacity(0.85) : Color.kimiBlue)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+                    .cursor(.pointingHand)
+                    .onHover { isHoveredReopen = $0 }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+        }
+    }
+
+    // MARK: 已授权
+
+    private func authorizedContent(_ token: KimiOAuthToken) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 22, weight: .regular))
+                .foregroundStyle(.green)
+                .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("已授权 Kimi 账号")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.kimiTextPrimary)
+
+                Text("凭证有效期至 \(oauthExpiryText(token))，到期自动续期")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.kimiTextSecondary)
+            }
+
+            Spacer()
+
+            Button(action: { model.logoutOAuth() }) {
+                Text("退出登录")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isHoveredLogout ? .red.opacity(0.9) : .red)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(isHoveredLogout ? Color.red.opacity(0.18) : Color.red.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .cursor(.pointingHand)
+            .onHover { isHoveredLogout = $0 }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    private func oauthExpiryText(_ token: KimiOAuthToken) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter.string(from: token.expiresAtDate)
+    }
+}
+
 // MARK: - 基本设置
 
 struct BasicSettingsView: View {
@@ -2619,12 +2849,111 @@ struct BasicSettingsView: View {
         )
     }
 
+    /// Token 登录方式下的 API Key 管理区域
+    private var apiKeySection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                if isEditingKey {
+                    SecureField("sk-kimi-...", text: $editingKey)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: .infinity)
+                        .focused($focusedField, equals: .apiKey)
+                        .onChange(of: editingKey) { _, newValue in
+                            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if trimmed != newValue {
+                                editingKey = trimmed
+                            }
+                        }
+                } else {
+                    Text(maskedKey(model.key))
+                        .font(.system(size: 13, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.kimiTextSecondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.kimiTextPrimary.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+
+                Button(action: {
+                    if isEditingKey {
+                        saveKey()
+                    } else {
+                        editingKey = model.key
+                        isEditingKey = true
+                        model.errorMessage = nil
+                        focusedField = .apiKey
+                    }
+                }) {
+                    Text(isEditingKey ? "保存" : "修改")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.kimiBlue)
+                .disabled(isEditingKey && editingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .cursor(isEditingKey && editingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .arrow : .pointingHand)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+
+            if let error = model.errorMessage {
+                SettingsCardDivider()
+                ErrorMessageView(message: error)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+            }
+
+            SettingsCardDivider()
+            SettingsCardRow(
+                title: "获取 API Key",
+                subtitle: "前往 Kimi 控制台创建并复制 API Key。"
+            ) {
+                LinkRow(
+                    title: "去控制台",
+                    icon: "arrow.up.right",
+                    url: URL(string: "https://www.kimi.com/code/console")!
+                )
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("基本设置")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundStyle(.kimiTextPrimary)
+
+                // 登录方式（默认授权登录，与 KimiCode CLI 共享凭证）
+                SettingsCard(
+                    title: "登录方式",
+                    footerText: model.loginMethod == .oauth
+                        ? "授权登录通过浏览器跳转 Kimi 账号完成认证，凭证与 KimiCode CLI 共享，过期自动续期。"
+                        : nil
+                ) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        SettingsCardRow(
+                            title: "认证方式",
+                            subtitle: "选择 KimiCodeBar 查询用量时使用的登录方式"
+                        ) {
+                            Picker("", selection: $model.loginMethod) {
+                                ForEach(LoginMethod.allCases) { method in
+                                    Text(method.displayName).tag(method)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(width: 200)
+                        }
+
+                        SettingsCardDivider()
+
+                        if model.loginMethod == .oauth {
+                            OAuthLoginSection()
+                        } else {
+                            apiKeySection
+                        }
+                    }
+                }
 
                 // 外观主题
                 HStack(alignment: .center, spacing: 16) {
@@ -2656,73 +2985,6 @@ struct BasicSettingsView: View {
                             .labelsHidden()
                             .toggleStyle(.switch)
                             .cursor(.pointingHand)
-                    }
-                }
-
-                // API Key
-                SettingsCard(title: "API Key") {
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack(spacing: 12) {
-                            if isEditingKey {
-                                SecureField("sk-kimi-...", text: $editingKey)
-                                    .textFieldStyle(.roundedBorder)
-                                    .frame(maxWidth: .infinity)
-                                    .focused($focusedField, equals: .apiKey)
-                                    .onChange(of: editingKey) { _, newValue in
-                                        let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                                        if trimmed != newValue {
-                                            editingKey = trimmed
-                                        }
-                                    }
-                            } else {
-                                Text(maskedKey(model.key))
-                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                                    .foregroundStyle(.kimiTextSecondary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.kimiTextPrimary.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-
-                            Button(action: {
-                                if isEditingKey {
-                                    saveKey()
-                                } else {
-                                    editingKey = model.key
-                                    isEditingKey = true
-                                    model.errorMessage = nil
-                                    focusedField = .apiKey
-                                }
-                            }) {
-                                Text(isEditingKey ? "保存" : "修改")
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.kimiBlue)
-                            .disabled(isEditingKey && editingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                            .cursor(isEditingKey && editingKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .arrow : .pointingHand)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 13)
-
-                        if let error = model.errorMessage {
-                            SettingsCardDivider()
-                            ErrorMessageView(message: error)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                        }
-
-                        SettingsCardDivider()
-                        SettingsCardRow(
-                            title: "获取 API Key",
-                            subtitle: "前往 Kimi 控制台创建并复制 API Key。"
-                        ) {
-                            LinkRow(
-                                title: "去控制台",
-                                icon: "arrow.up.right",
-                                url: URL(string: "https://www.kimi.com/code/console")!
-                            )
-                        }
                     }
                 }
 
@@ -3466,6 +3728,22 @@ extension View {
     }
 }
 
+// MARK: - 登录方式
+
+enum LoginMethod: String, CaseIterable, Identifiable {
+    case oauth
+    case token
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .oauth: return "授权登录"
+        case .token: return "Token 登录"
+        }
+    }
+}
+
 // MARK: - 本地服务状态
 
 enum KimiServerStatus: Equatable {
@@ -3496,6 +3774,9 @@ final class KimiCodeBarModel: ObservableObject {
     static let shared = KimiCodeBarModel()
 
     @AppStorage("kimiApiKey") var key = ""
+    @AppStorage("loginMethod") var loginMethod: LoginMethod = .oauth {
+        didSet { refresh() }
+    }
     @AppStorage("quotaRefreshInterval") var quotaRefreshInterval: Double = 5
     @AppStorage("updateCheckInterval") var updateCheckInterval: Double = 30
     @AppStorage("menuBarDisplayScheme") var menuBarDisplayScheme: MenuBarDisplayScheme = .compact
@@ -3508,6 +3789,11 @@ final class KimiCodeBarModel: ObservableObject {
     @Published var quota: KimiQuota?
     @Published var errorMessage: String?
     @Published var isLoading = false
+
+    @Published var oauthToken: KimiOAuthToken?
+    @Published var oauthDeviceAuth: KimiDeviceAuthorization?
+    @Published var oauthLoginInProgress = false
+    @Published var oauthLoginError: String?
 
     @Published var kimiVersion: String = "检测中…"
     @Published var isCheckingUpdate: Bool = false
@@ -3536,10 +3822,21 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     private let service = KimiCodeBarQuotaService()
+    private let oauthService = KimiOAuthService()
+    private var oauthLoginTask: Task<Void, Never>?
     private var timer: Timer?
     private var updateTimer: Timer?
 
+    /// 当前是否已配置可用凭证（决定菜单栏是否提示去设置）
+    var hasCredential: Bool {
+        switch loginMethod {
+        case .token: return !key.isEmpty
+        case .oauth: return oauthToken != nil
+        }
+    }
+
     init() {
+        oauthToken = KimiOAuthService.loadStoredToken()
         refresh()
         Task { await loadKimiVersion() }
         startQuotaTimer()
@@ -3571,19 +3868,21 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     func refresh() {
-        guard !key.isEmpty else {
-            text = "未配置"
-            quota = nil
-            errorMessage = nil
-            return
-        }
-
         isLoading = true
         errorMessage = nil
         let startTime = Date()
 
         Task {
-            let result = await service.fetchQuota(key: key)
+            guard let bearerToken = await resolveBearerToken() else {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.quota = nil
+                    self.text = "未配置"
+                }
+                return
+            }
+
+            let result = await service.fetchQuota(token: bearerToken)
 
             let elapsed = Date().timeIntervalSince(startTime)
             let remaining = max(0, 0.5 - elapsed)
@@ -3605,6 +3904,145 @@ final class KimiCodeBarModel: ObservableObject {
                     self.errorMessage = errorDescription(error)
                 }
             }
+        }
+    }
+
+    /// 根据当前登录方式解析 Bearer 凭证。
+    /// OAuth 模式下每次从磁盘重读（兼容 CLI 侧刷新），过期前自动用 refresh_token 换新。
+    private func resolveBearerToken() async -> String? {
+        switch loginMethod {
+        case .token:
+            return key.isEmpty ? nil : key
+        case .oauth:
+            if let fresh = KimiOAuthService.loadStoredToken() {
+                oauthToken = fresh
+            }
+            guard let token = oauthToken, token.isValid else { return nil }
+
+            guard token.needsRefresh else {
+                return token.accessToken
+            }
+
+            // 刷新前再读一次磁盘：CLI 等进程可能刚完成刷新并写入了新凭证
+            if let latest = KimiOAuthService.loadStoredToken(),
+               latest.accessToken != token.accessToken,
+               !latest.needsRefresh {
+                oauthToken = latest
+                return latest.accessToken
+            }
+
+            let result = await oauthService.refreshAccessToken(token)
+            switch result {
+            case .success(let newToken):
+                KimiOAuthService.saveToken(newToken)
+                oauthToken = newToken
+                return newToken.accessToken
+            case .failure(.unauthorized):
+                // 若磁盘上已是另一份凭证（其他进程刷新成功），直接沿用而不是误删
+                if let latest = KimiOAuthService.loadStoredToken(),
+                   latest.accessToken != token.accessToken {
+                    oauthToken = latest
+                    return latest.accessToken
+                }
+                // 授权已被吊销，清除本地凭证，等待用户重新授权
+                oauthToken = nil
+                KimiOAuthService.clearToken()
+                return nil
+            case .failure:
+                // 网络等原因刷新失败，先沿用旧 token 让服务端决定是否拒绝
+                return token.accessToken
+            }
+        }
+    }
+
+    // MARK: - OAuth 授权登录
+
+    /// 启动 Device Code Flow：请求设备码 → 打开浏览器 → 后台轮询直至授权完成。
+    func startOAuthLogin() {
+        oauthLoginTask?.cancel()
+        oauthLoginError = nil
+        oauthDeviceAuth = nil
+        oauthLoginInProgress = true
+
+        oauthLoginTask = Task {
+            let result = await oauthService.requestDeviceAuthorization()
+            guard !Task.isCancelled else { return }
+
+            let auth: KimiDeviceAuthorization
+            switch result {
+            case .failure(let error):
+                oauthLoginInProgress = false
+                oauthLoginError = oauthErrorDescription(error)
+                return
+            case .success(let value):
+                auth = value
+                oauthDeviceAuth = auth
+                if let urlString = auth.displayURL, let url = URL(string: urlString) {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+
+            let pollResult = await oauthService.pollDeviceToken(
+                deviceCode: auth.deviceCode,
+                initialInterval: TimeInterval(auth.interval ?? 5)
+            )
+            guard !Task.isCancelled else { return }
+
+            oauthLoginInProgress = false
+            oauthDeviceAuth = nil
+            switch pollResult {
+            case .success(let token):
+                KimiOAuthService.saveToken(token)
+                oauthToken = token
+                refresh()
+            case .failure(let error) where error != .cancelled:
+                oauthLoginError = oauthErrorDescription(error)
+            case .failure:
+                break
+            }
+        }
+    }
+
+    func cancelOAuthLogin() {
+        oauthLoginTask?.cancel()
+        oauthLoginTask = nil
+        oauthDeviceAuth = nil
+        oauthLoginInProgress = false
+    }
+
+    /// 退出授权登录：取消进行中的授权流程并清除本地凭证。
+    func logoutOAuth() {
+        cancelOAuthLogin()
+        oauthLoginError = nil
+        oauthToken = nil
+        KimiOAuthService.clearToken()
+        quota = nil
+        text = "未配置"
+        errorMessage = nil
+    }
+
+    private func oauthErrorDescription(_ error: KimiOAuthError) -> String {
+        switch error {
+        case .invalidURL:
+            return "授权请求地址无效"
+        case .networkError(let msg):
+            return "网络错误：\(msg)"
+        case .httpError(let code, let msg):
+            return "授权服务返回错误（\(code)）：\(msg)"
+        case .invalidResponse:
+            return "无法解析授权服务返回数据"
+        case .authorizationPending, .slowDown:
+            return "等待授权中"
+        case .expiredToken:
+            return "授权码已过期，请重新发起授权"
+        case .accessDenied:
+            return "授权被拒绝"
+        case .unauthorized:
+            return "授权已失效，请重新登录"
+        case .cancelled:
+            return "已取消授权"
+        case .timeout:
+            return "授权超时，请重新发起授权"
         }
     }
 
