@@ -20,6 +20,7 @@ struct BoosterWallet: Equatable {
     let status: String
     let isEnabled: Bool
     let currency: String
+    let balanceYuan: Double
     let monthlyChargeLimitCents: Int
     let monthlyUsedCents: Int
     let topupLimitCents: Int
@@ -27,7 +28,6 @@ struct BoosterWallet: Equatable {
     var monthlyChargeLimitYuan: Double { Double(monthlyChargeLimitCents) / 100.0 }
     var monthlyUsedYuan: Double { Double(monthlyUsedCents) / 100.0 }
     var topupLimitYuan: Double { Double(topupLimitCents) / 100.0 }
-    var balanceYuan: Double { max(0, monthlyChargeLimitYuan - monthlyUsedYuan) }
 }
 
 struct KimiQuota: Equatable {
@@ -136,7 +136,13 @@ final class KimiCodeBarQuotaService {
                     let currency: String?
                     let priceInCents: String?
                 }
+                struct Balance: Codable {
+                    let amount: String?
+                    let amountLeft: String?
+                    let unit: String?
+                }
                 let status: String?
+                let balance: Balance?
                 let monthlyChargeLimit: Money?
                 let monthlyUsed: Money?
                 let topupLimit: Money?
@@ -181,17 +187,29 @@ final class KimiCodeBarQuotaService {
         let boosterWallet: BoosterWallet? = {
             guard let raw = resp.boosterWallet else { return nil }
             let status = raw.status ?? "STATUS_UNKNOWN"
-            let isEnabled = status.uppercased() == "STATUS_ENABLED"
+            let upperStatus = status.uppercased()
+            let isEnabled = upperStatus == "STATUS_ACTIVE" || upperStatus == "STATUS_ENABLED"
             let currency = raw.monthlyChargeLimit?.currency
                 ?? raw.monthlyUsed?.currency
                 ?? raw.topupLimit?.currency
                 ?? "CNY"
+            let monthlyChargeLimitCents = Int(raw.monthlyChargeLimit?.priceInCents ?? "0") ?? 0
+            let monthlyUsedCents = Int(raw.monthlyUsed?.priceInCents ?? "0") ?? 0
+            // 真实余额来自 balance.amountLeft，单位为 1e-8 元（如 315250700 = ¥3.15）；
+            // 缺失时回退为「月度上限 - 当月消费」的估算值。
+            let balanceYuan: Double
+            if let amountLeft = raw.balance?.amountLeft, let v = Double(amountLeft) {
+                balanceYuan = max(0, v / 100_000_000.0)
+            } else {
+                balanceYuan = max(0, Double(monthlyChargeLimitCents - monthlyUsedCents) / 100.0)
+            }
             return BoosterWallet(
                 status: status,
                 isEnabled: isEnabled,
                 currency: currency,
-                monthlyChargeLimitCents: Int(raw.monthlyChargeLimit?.priceInCents ?? "0") ?? 0,
-                monthlyUsedCents: Int(raw.monthlyUsed?.priceInCents ?? "0") ?? 0,
+                balanceYuan: balanceYuan,
+                monthlyChargeLimitCents: monthlyChargeLimitCents,
+                monthlyUsedCents: monthlyUsedCents,
                 topupLimitCents: Int(raw.topupLimit?.priceInCents ?? "0") ?? 0
             )
         }()
