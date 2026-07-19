@@ -2073,6 +2073,290 @@
         overflow-x: hidden;
       }
 
+      /* ============ Hero 循环演示 ============
+         时序（10s 一轮）：
+         0–15%   镜头放大至顶部菜单（聚焦 7D/5H 额度芯片）
+         15–28%  定格放大
+         28–42%  镜头拉回正常
+         42–50%  正常视图短暂停留
+         50–58%  鼠标从右下角飞向 7D/5H 芯片
+         58–63%  点击（波纹扩散 + 芯片高亮）
+         63–66%  面板弹出
+         66–90%  面板停留约 2.4s
+         90–93%  面板收回
+         93–96%  鼠标离开
+         96–100% 短暂停留后无缝循环
+      */
+      .hero-shot.demo-loop {
+        overflow: visible;
+        animation: demo-shot-zoom 10s ease-in-out infinite;
+        transform-origin: 50% 0%;
+        will-change: transform;
+      }
+
+      @keyframes demo-shot-zoom {
+        0%,
+        5% {
+          transform: scale(1);
+        }
+        15%,
+        28% {
+          transform: scale(1.85);
+        }
+        42%,
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      /* 演示期间：面板默认收起，等点击后弹出 */
+      .hero-shot.demo-loop .hero-panel {
+        opacity: 0;
+        transform-origin: 50% 0%;
+        animation: demo-panel-show 10s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        will-change: transform, opacity;
+      }
+
+      @keyframes demo-panel-show {
+        0%,
+        62% {
+          opacity: 0;
+          transform: scale(0.94) translateY(-10px);
+        }
+        66% {
+          opacity: 1;
+          transform: scale(1.02) translateY(0);
+        }
+        68% {
+          opacity: 1;
+          transform: scale(0.99) translateY(0);
+        }
+        71%,
+        90% {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+        93% {
+          opacity: 0;
+          transform: scale(0.94) translateY(-6px);
+        }
+        100% {
+          opacity: 0;
+          transform: scale(0.94) translateY(-6px);
+        }
+      }
+
+      /* 鼠标光标：macOS 箭头 */
+      .demo-cursor {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 28px;
+        height: 28px;
+        pointer-events: none;
+        opacity: 0;
+        z-index: 20;
+        filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+        animation: demo-cursor-move 10s cubic-bezier(0.45, 0.05, 0.2, 1) infinite;
+        will-change: top, left, opacity;
+      }
+
+      .demo-cursor svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      @keyframes demo-cursor-move {
+        0%,
+        50% {
+          opacity: 0;
+          top: 92%;
+          left: 90%;
+        }
+        53% {
+          opacity: 1;
+          top: 92%;
+          left: 90%;
+        }
+        58% {
+          opacity: 1;
+          top: 4.4%;
+          left: 44.4%;
+        }
+        63% {
+          opacity: 1;
+          top: 4.4%;
+          left: 44.4%;
+        }
+        90% {
+          opacity: 1;
+          top: 4.4%;
+          left: 44.4%;
+        }
+        93% {
+          opacity: 1;
+          top: 92%;
+          left: 90%;
+        }
+        96%,
+        100% {
+          opacity: 0;
+          top: 92%;
+          left: 90%;
+        }
+      }
+
+      /* 点击波纹：以光标位置为圆心，向外扩散并淡出 */
+      .demo-ripple {
+        position: absolute;
+        top: 4.4%;
+        left: 44.4%;
+        width: 56px;
+        height: 56px;
+        margin-left: -28px;
+        margin-top: -28px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.12) 55%, transparent 80%);
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        pointer-events: none;
+        opacity: 0;
+        z-index: 19;
+        transform: scale(0);
+        animation: demo-ripple 10s ease-out infinite;
+        will-change: transform, opacity;
+      }
+
+      @keyframes demo-ripple {
+        0%,
+        60% {
+          opacity: 0;
+          transform: scale(0.2);
+        }
+        63% {
+          opacity: 1;
+          transform: scale(0.45);
+        }
+        70% {
+          opacity: 0.35;
+          transform: scale(1.2);
+        }
+        76%,
+        100% {
+          opacity: 0;
+          transform: scale(1.7);
+        }
+      }
+
+      /* 7D/5H 额度芯片：被点击瞬间的蓝光高亮 */
+      .hero-shot.demo-loop .hero-widget {
+        position: relative;
+        z-index: 5;
+        animation: demo-widget-glow 10s ease-in-out infinite;
+      }
+
+      @keyframes demo-widget-glow {
+        0%,
+        58% {
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 0 rgba(45, 117, 246, 0);
+          background: rgba(255, 255, 255, 0.1);
+        }
+        63% {
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 3px rgba(91, 147, 255, 0.7), 0 0 22px rgba(91, 147, 255, 0.55);
+          background: rgba(255, 255, 255, 0.24);
+        }
+        74%,
+        100% {
+          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 0 rgba(45, 117, 246, 0);
+          background: rgba(255, 255, 255, 0.1);
+        }
+      }
+
+      /* 镜头放大时，菜单栏更突出：补一点发光描边，提示"这就是被聚焦的对象" */
+      .hero-shot.demo-loop .hero-menubar {
+        transition: filter 0.4s ease;
+        animation: demo-menubar-focus 10s ease-in-out infinite;
+      }
+
+      @keyframes demo-menubar-focus {
+        0%,
+        5% {
+          filter: none;
+        }
+        18%,
+        26% {
+          filter: drop-shadow(0 8px 24px rgba(91, 147, 255, 0.4));
+        }
+        40%,
+        100% {
+          filter: none;
+        }
+      }
+
+      /* 焦点环：放大镜头时强调 7D/5H 芯片（柔和脉动外环） */
+      .demo-spotlight {
+        position: absolute;
+        top: 1.5%;
+        left: 39.4%;
+        width: 58px;
+        height: 36px;
+        margin-left: -4px;
+        margin-top: -2px;
+        border-radius: 10px;
+        border: 1.5px dashed rgba(91, 147, 255, 0);
+        pointer-events: none;
+        z-index: 6;
+        opacity: 0;
+        animation: demo-spotlight-pulse 10s ease-in-out infinite;
+      }
+
+      @keyframes demo-spotlight-pulse {
+        0%,
+        4% {
+          opacity: 0;
+          border-color: rgba(91, 147, 255, 0);
+        }
+        10% {
+          opacity: 0.9;
+          border-color: rgba(91, 147, 255, 0.75);
+        }
+        18%,
+        26% {
+          opacity: 0.9;
+          border-color: rgba(91, 147, 255, 0.75);
+        }
+        32% {
+          opacity: 0;
+          border-color: rgba(91, 147, 255, 0);
+        }
+        100% {
+          opacity: 0;
+          border-color: rgba(91, 147, 255, 0);
+        }
+      }
+
+      /* 减少动效偏好：禁用循环，直接展示最终态 */
+      @media (prefers-reduced-motion: reduce) {
+        .hero-shot.demo-loop,
+        .hero-shot.demo-loop .hero-panel,
+        .demo-cursor,
+        .demo-ripple,
+        .hero-shot.demo-loop .hero-widget,
+        .hero-shot.demo-loop .hero-menubar,
+        .demo-spotlight {
+          animation: none !important;
+        }
+        .hero-shot.demo-loop .hero-panel {
+          opacity: 1;
+          transform: none;
+        }
+        .demo-cursor,
+        .demo-ripple,
+        .demo-spotlight {
+          opacity: 0;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
@@ -2147,9 +2431,14 @@
         <!-- <p class="hero-note reveal">通过 GitHub Releases 免费分发 · 数据仅存储在本地</p> -->
       </div>
 
-      <!-- 产品面板展示 -->
+      <!-- 产品面板展示 —— 循环演示 -->
       <div class="container shot-wrap reveal">
-        <div class="hero-shot">
+        <div class="hero-shot demo-loop" aria-label="KimiCodeBar 菜单栏用量监控演示">
+          <div class="hero-glow"></div>
+          <div class="hero-orb hero-orb-1"></div>
+          <div class="hero-orb hero-orb-2"></div>
+          <!-- 演示焦点环：定格在 7D / 5H 额度芯片上 -->
+          <div class="demo-spotlight" aria-hidden="true"></div>
           <div class="hero-glow"></div>
           <div class="hero-orb hero-orb-1"></div>
           <div class="hero-orb hero-orb-2"></div>
@@ -2205,6 +2494,13 @@
             <div class="kp-mount" data-theme="dark"></div>
             <noscript><img src="assets/panel-01.png" alt="KimiCodeBar 暗夜模式面板" /></noscript>
           </div>
+          <!-- 鼠标光标 + 点击波纹：循环演示用 -->
+          <div class="demo-cursor" aria-hidden="true">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 2 L3 21.5 L7.6 17.4 L10.4 22.6 L13 21.4 L10.2 16.2 L17 15.4 Z" fill="#fff" stroke="#1a1a1a" stroke-width="1.2" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <div class="demo-ripple" aria-hidden="true"></div>
         </div>
       </div>
     </header>
