@@ -2075,9 +2075,9 @@
 
       /* ============ Hero 循环演示 ============
          时序（10s 一轮）：
-         0–15%   局部放大 7D/5H 额度芯片（外层仿 Mac 桌面盒子保持不动）
+         0–15%   镜头以 7D/5H 标签为中心推近：菜单栏整体放大（仿 Mac 桌面盒子保持不动）
          15–28%  定格放大
-         28–42%  芯片缩回原尺寸
+         28–42%  镜头拉回，菜单栏恢复原尺寸
          42–50%  正常视图短暂停留
          50–58%  鼠标从右下角飞向 7D/5H 芯片
          58–63%  点击（波纹扩散 + 芯片高亮）
@@ -2088,12 +2088,34 @@
          96–100% 短暂停留后无缝循环
       */
       .hero-shot.demo-loop {
-        /* 外层盒子保持原样：不缩放、不溢出，仿 Mac 桌面边框 / 阴影稳定 */
+        /* 外层盒子的边框 / 圆角 / 阴影保持原样不动；
+           overflow 改 visible，让 menubar 放大时能溢出到 hero-shot 之外（Apple 图标 / 右侧图标被"镜头推开"） */
+        overflow: visible;
       }
 
-      /* 菜单栏 z-index 抬到 panel 之上，让放大后的芯片能盖住面板区域 */
+      /* 菜单栏：作为"镜头下的场景"整体放大；
+         镜头中心对准 7D/5H 标签中心（约在菜单栏 46% / 50% 处），
+         所以放大时 widget 自身位置不变，Apple 图标被推左、WiFi/电池/控制中心/时钟被推右。 */
       .hero-shot.demo-loop .hero-menubar {
         z-index: 5;
+        transform-origin: 46% 50%;
+        animation: demo-menubar-zoom 10s ease-in-out infinite;
+        will-change: transform;
+      }
+
+      @keyframes demo-menubar-zoom {
+        0%,
+        5% {
+          transform: scale(1);
+        }
+        15%,
+        28% {
+          transform: scale(2.4);
+        }
+        42%,
+        100% {
+          transform: scale(1);
+        }
       }
 
       /* 演示期间：面板默认收起，等点击后弹出 */
@@ -2235,46 +2257,28 @@
         }
       }
 
-      /* 7D/5H 额度芯片：局部放大（外层盒子不动）+ 被点击瞬间蓝光高亮 */
+      /* 7D/5H 额度芯片：跟着 menubar 一起被镜头放大；自己只负责点击瞬间的蓝光高亮 */
       .hero-shot.demo-loop .hero-widget {
         position: relative;
         z-index: 6;
-        transform-origin: center center;
-        animation: demo-widget-anim 10s ease-in-out infinite;
-        will-change: transform, box-shadow, background;
+        animation: demo-widget-glow 10s ease-in-out infinite;
+        will-change: box-shadow, background;
       }
 
-      @keyframes demo-widget-anim {
-        /* 默认状态：原尺寸、无高亮 */
+      @keyframes demo-widget-glow {
+        /* 默认状态：原色、无高亮（由 menubar 的 scale 负责放大） */
         0%,
-        5% {
-          transform: scale(1);
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 0 rgba(45, 117, 246, 0);
-          background: rgba(255, 255, 255, 0.1);
-        }
-        /* 局部放大到 2.4x，定格聚焦 */
-        15%,
-        28% {
-          transform: scale(2.4);
-          box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 0 rgba(45, 117, 246, 0);
-          background: rgba(255, 255, 255, 0.1);
-        }
-        /* 缩回原尺寸 */
-        42%,
         57% {
-          transform: scale(1);
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 0 rgba(45, 117, 246, 0);
           background: rgba(255, 255, 255, 0.1);
         }
         /* 被点击瞬间：蓝光高亮 */
         63% {
-          transform: scale(1);
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 3px rgba(91, 147, 255, 0.7), 0 0 22px rgba(91, 147, 255, 0.55);
           background: rgba(255, 255, 255, 0.24);
         }
         74%,
         100% {
-          transform: scale(1);
           box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), 0 0 0 0 rgba(45, 117, 246, 0);
           background: rgba(255, 255, 255, 0.1);
         }
@@ -2294,7 +2298,7 @@
           opacity: 1;
           transform: none;
         }
-        .hero-shot.demo-loop .hero-widget {
+        .hero-shot.demo-loop .hero-menubar {
           transform: none;
         }
         .demo-cursor,
