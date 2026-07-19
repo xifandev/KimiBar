@@ -296,113 +296,168 @@
         color: var(--text-3);
       }
 
-      /* ============ 桌面产品图 ============ */
+      /* ============ 产品面板展示 ============ */
       .shot-wrap {
         padding: 64px 0 20px;
       }
 
-      .screen {
+      .hero-shot {
         position: relative;
-        border-radius: 24px;
+        max-width: 420px;
+        margin: 0 auto;
+        padding: 34px 28px 40px;
+        border-radius: 32px;
         border: 1px solid var(--border-strong);
-        overflow: hidden;
-        aspect-ratio: 16 / 10;
-        background: radial-gradient(120% 130% at 85% 0%, #27335c 0%, transparent 55%), radial-gradient(110% 120% at 5% 100%, #14224a 0%, transparent 55%), linear-gradient(160deg, #101830 0%, #0a0f1e 60%, #070b15 100%);
+        background: radial-gradient(130% 140% at 85% 0%, rgba(59, 130, 245, 0.18) 0%, transparent 55%),
+          radial-gradient(120% 120% at 5% 100%, rgba(123, 97, 255, 0.12) 0%, transparent 55%),
+          linear-gradient(160deg, #121a2e 0%, #0c1222 55%, #070b15 100%);
         box-shadow:
-          0 40px 90px rgba(0, 0, 0, 0.55),
+          0 40px 100px rgba(0, 0, 0, 0.55),
           0 0 0 1px rgba(255, 255, 255, 0.04) inset,
-          0 0 120px rgba(45, 117, 246, 0.1);
+          0 0 120px rgba(45, 117, 246, 0.12);
+        overflow: hidden;
       }
 
-      /* 模拟 macOS 菜单栏 */
-      .mockbar {
+      .hero-shot::before {
+        content: '';
         position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 34px;
+        inset: 1px;
+        border-radius: 31px;
+        background: linear-gradient(
+          135deg,
+          rgba(255, 255, 255, 0.06) 0%,
+          transparent 40%,
+          transparent 60%,
+          rgba(255, 255, 255, 0.03) 100%
+        );
+        pointer-events: none;
+      }
+
+      .hero-glow {
+        position: absolute;
+        bottom: -25%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        height: 70%;
+        background: radial-gradient(ellipse at center, rgba(59, 130, 245, 0.35) 0%, transparent 70%);
+        filter: blur(50px);
+        pointer-events: none;
+      }
+
+      .hero-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(70px);
+        pointer-events: none;
+      }
+
+      .hero-orb-1 {
+        top: -15%;
+        right: -15%;
+        width: 200px;
+        height: 200px;
+        background: rgba(59, 130, 245, 0.22);
+      }
+
+      .hero-orb-2 {
+        bottom: 0%;
+        left: -15%;
+        width: 160px;
+        height: 160px;
+        background: rgba(123, 97, 255, 0.16);
+      }
+
+      /* 顶部状态条 */
+      .hero-menubar {
+        position: relative;
+        z-index: 2;
         display: flex;
         align-items: center;
-        padding: 0 16px;
-        font-size: 12px;
-        background: rgba(16, 21, 35, 0.55);
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 12px;
+        margin-bottom: 18px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         backdrop-filter: blur(20px) saturate(1.5);
         -webkit-backdrop-filter: blur(20px) saturate(1.5);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        font-size: 12px;
         color: rgba(255, 255, 255, 0.92);
         user-select: none;
       }
 
-      .mockbar .apple {
-        font-size: 14px;
-        margin-right: 18px;
-        transform: translateY(-0.5px);
-      }
-      .mockbar .app-name {
-        font-weight: 700;
-        margin-right: 18px;
-      }
-      .mockbar .menu {
-        margin-right: 16px;
-        color: rgba(255, 255, 255, 0.75);
-      }
-
-      .mockbar .right {
-        margin-left: auto;
+      .hero-menubar-left {
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 8px;
       }
 
-      /* 菜单栏小组件：7D / 5H */
-      .widget {
-        display: flex;
-        gap: 7px;
-        font-size: 8.5px;
+      .hero-menubar-left img {
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      }
+
+      .hero-menubar-left span {
         font-weight: 700;
-        line-height: 1.25;
-        letter-spacing: 0.2px;
-        padding: 2px 6px;
-        border-radius: 6px;
+      }
+
+      .hero-menubar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .hero-widget {
+        display: flex;
+        gap: 8px;
+        padding: 4px 8px;
+        border-radius: 8px;
         background: rgba(255, 255, 255, 0.1);
         box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
       }
 
-      .widget .row {
+      .hero-widget-row {
         display: flex;
         flex-direction: column;
+        align-items: center;
+        line-height: 1.2;
       }
-      .widget .k {
-        color: rgba(255, 255, 255, 0.62);
+
+      .hero-widget-k {
+        font-size: 7px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.55);
+        letter-spacing: 0.3px;
       }
-      .widget .v {
+
+      .hero-widget-v {
+        font-size: 10px;
+        font-weight: 700;
         color: #fff;
       }
 
-      .widget .pair {
-        display: flex;
-        gap: 3px;
-      }
-      .widget .pair span:first-child {
-        color: rgba(255, 255, 255, 0.62);
-      }
-
-      .mockbar .clock {
-        color: rgba(255, 255, 255, 0.85);
+      .hero-clock {
+        color: rgba(255, 255, 255, 0.75);
         font-variant-numeric: tabular-nums;
+        font-size: 11px;
       }
 
-      /* 悬浮面板截图/复刻 */
-      .panel-float {
-        position: absolute;
-        top: 46px;
-        right: 26px;
-        width: min(300px, 34%);
-        animation: floaty 7s ease-in-out infinite;
+      /* 主面板 */
+      .hero-panel {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        max-width: 340px;
+        margin: 0 auto;
       }
 
-      .panel-float .kp,
-      .panel-float img {
+      .hero-panel .kp,
+      .hero-panel img {
+        width: 100%;
         border-radius: 22px;
         border: 1px solid rgba(255, 255, 255, 0.14);
         box-shadow:
@@ -410,10 +465,13 @@
           0 0 60px rgba(45, 117, 246, 0.18);
       }
 
-      .panel-float img {
+      .hero-panel img {
         display: block;
-        width: 100%;
         height: auto;
+      }
+
+      .hero-panel .kp {
+        animation: floaty 7s ease-in-out infinite;
       }
 
       @keyframes floaty {
@@ -422,38 +480,8 @@
           transform: translateY(0);
         }
         50% {
-          transform: translateY(-9px);
+          transform: translateY(-8px);
         }
-      }
-
-      /* 模拟 Dock */
-      .dock {
-        position: absolute;
-        left: 50%;
-        bottom: 14px;
-        transform: translateX(-50%);
-        display: flex;
-        align-items: flex-end;
-        gap: 8px;
-        padding: 8px 10px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-      }
-
-      .dock i {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
-      }
-
-      .dock i.kb {
-        background: var(--blue) url(assets/logo.gif) center / 80% no-repeat;
-        box-shadow: 0 4px 14px rgba(45, 117, 246, 0.5);
       }
 
       /* ============ 通用 Section ============ */
@@ -1665,17 +1693,6 @@
         }
       }
 
-      .kp-scale {
-        transform-origin: top right;
-      }
-
-      /* 复刻面板在 hero 中的缩放适配 */
-      @media (max-width: 960px) {
-        .kp-scale {
-          transform: scale(0.8);
-        }
-      }
-
       .showcase-note {
         margin: 30px auto 0;
         max-width: 560px;
@@ -1887,22 +1904,28 @@
         .platforms {
           grid-template-columns: 1fr;
         }
-        .mockbar .menu {
+        .hero-shot {
+          padding: 24px 18px 30px;
+          border-radius: 24px;
+        }
+        .hero-menubar {
+          padding: 6px 10px;
+          margin-bottom: 14px;
+        }
+        .hero-menubar-left span {
           display: none;
         }
-        .panel-float {
+        .hero-clock {
           display: none;
         }
-        .dock i {
-          width: 26px;
-          height: 26px;
-          border-radius: 7px;
+        .hero-panel {
+          max-width: 320px;
+        }
+        .hero-panel .kp {
+          animation: none;
         }
         .update-visual .notify {
           right: -4px;
-        }
-        .screen {
-          aspect-ratio: 4 / 3;
         }
       }
 
@@ -1971,32 +1994,35 @@
         <!-- <p class="hero-note reveal">通过 GitHub Releases 免费分发 · 数据仅存储在本地</p> -->
       </div>
 
-      <!-- 桌面产品图 -->
+      <!-- 产品面板展示 -->
       <div class="container shot-wrap reveal">
-        <div class="screen">
-          <!-- 模拟菜单栏 -->
-          <div class="mockbar">
-            <span class="apple"></span>
-            <span class="app-name">KimiCodeBar</span>
-            <span class="menu">控制台</span>
-            <span class="menu">设置</span>
-            <span class="menu">帮助</span>
-            <div class="right">
-              <div class="widget" title="本周用量 84% · 5 小时用量 6%">
-                <div class="row">
-                  <div class="pair"><span>7D</span><span class="v">84%</span></div>
-                  <div class="pair"><span>5H</span><span class="v">6%</span></div>
+        <div class="hero-shot">
+          <div class="hero-glow"></div>
+          <div class="hero-orb hero-orb-1"></div>
+          <div class="hero-orb hero-orb-2"></div>
+          <div class="hero-menubar">
+            <div class="hero-menubar-left">
+              <img src="assets/logo.gif" alt="" />
+              <span>KimiCodeBar</span>
+            </div>
+            <div class="hero-menubar-right">
+              <div class="hero-widget" title="本周用量 84% · 5 小时用量 6%">
+                <div class="hero-widget-row">
+                  <span class="hero-widget-k">7D</span>
+                  <span class="hero-widget-v">84%</span>
+                </div>
+                <div class="hero-widget-row">
+                  <span class="hero-widget-k">5H</span>
+                  <span class="hero-widget-v">6%</span>
                 </div>
               </div>
-              <span class="clock" id="mockClock"></span>
+              <span class="hero-clock" id="mockClock"></span>
             </div>
           </div>
-          <div class="panel-float">
-            <div class="kp-scale"><div class="kp-mount" data-theme="dark"></div></div>
+          <div class="hero-panel">
+            <div class="kp-mount" data-theme="dark"></div>
             <noscript><img src="assets/panel-01.png" alt="KimiCodeBar 暗夜模式面板" /></noscript>
           </div>
-          <!-- Dock -->
-          <div class="dock"><i></i><i></i><i></i><i class="kb" title="KimiCodeBar"></i><i></i><i></i></div>
         </div>
       </div>
     </header>
