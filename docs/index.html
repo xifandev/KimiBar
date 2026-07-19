@@ -2032,6 +2032,49 @@
         }
       }
 
+      /* 极窄屏（iPhone SE 320px 之类）防御性修复 */
+      @media (max-width: 380px) {
+        .container {
+          padding: 0 16px;
+        }
+        .hero h1 {
+          font-size: 26px;
+          letter-spacing: -0.5px;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+        .hero .sub {
+          font-size: 14px;
+        }
+        .hero-shot {
+          max-width: 100%;
+        }
+        .hero-panel {
+          max-width: 100%;
+        }
+        .duo {
+          grid-template-columns: 1fr;
+        }
+        .duo figure {
+          max-width: 240px;
+          margin: 0 auto;
+        }
+        .privacy {
+          grid-template-columns: 1fr;
+        }
+        .privacy .card:nth-child(3) {
+          grid-column: auto;
+        }
+        .privacy .card {
+          padding: 22px 20px;
+        }
+      }
+
+      /* 防止任何意外横向溢出 */
+      body {
+        overflow-x: hidden;
+      }
+
       @media (prefers-reduced-motion: reduce) {
         *,
         *::before,
