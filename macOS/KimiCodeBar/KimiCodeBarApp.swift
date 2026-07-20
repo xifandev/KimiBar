@@ -4378,18 +4378,9 @@ final class KimiCodeBarModel: ObservableObject {
 
     func openKimiWeb() {
         let port = kimiServerState.port
-        var urlString = "http://127.0.0.1:\(port)/"
-
-        // kimi web 默认开启 bearer token 鉴权，URL 需带 #token=xxx 才能访问 Web UI
-        // token 持久化在 ~/.kimi-code/server.token（kimi web rotate-token 会更新此文件）
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let tokenPath = "\(home)/.kimi-code/server.token"
-        if let token = try? String(contentsOfFile: tokenPath, encoding: .utf8)
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !token.isEmpty,
-           let encoded = token.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed) {
-            urlString = "http://127.0.0.1:\(port)/#token=\(encoded)"
-        }
+        // LaunchAgent 使用 --dangerous-bypass-auth 关闭 bearer-token 鉴权，
+        // 直接打开本地地址即可，无需再拼接 #token=xxx。
+        let urlString = "http://127.0.0.1:\(port)/"
 
         if let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
@@ -4402,21 +4393,11 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     func startKimiServer() async {
-        // 呼出 Terminal.app 执行 kimi web 命令，让用户在可视化终端里看 server 运行状态
-        // 跟 installKimiCLIUpdate 同样模式：KimiCodeBar 不接管 server 进程，只帮用户打开终端输入命令
-        // server 进程归 Terminal 管理，KimiCodeBar 退出/crash 不影响
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        task.arguments = [
-            "-e",
-            """
-            tell application "Terminal"
-                activate
-                do script "kimi web"
-            end tell
-            """
-        ]
-        try? task.run()
+        // 通过 LaunchAgent 在后台启动 kimi web，不弹终端窗口。
+        // 服务由 launchd 管理，KimiCodeBar 退出/crash 后仍可继续运行。
+        let manager = KimiWebLaunchAgentManager.shared
+        await manager.install()
+        await manager.start()
 
         // 轮询等待 server 起来（最多 10 秒）
         for _ in 0..<10 {
@@ -4428,10 +4409,18 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     func stopKimiServer() async {
+        let manager = KimiWebLaunchAgentManager.shared
+
         // kimi web kill all：先 POST /api/v1/shutdown 优雅退出，再 SIGTERM/SIGKILL，停止全部实例
         _ = await runKimiCommand(arguments: ["web", "kill", "all"])
+
+        // 立即卸载 LaunchAgent，避免 KeepAlive 在进程退出后自动重启服务
+        await manager.stop()
+        await manager.uninstall()
+
         // 给优雅退出一点时间
         try? await Task.sleep(nanoseconds: 1_000_000_000)
+
         await refreshKimiServerState()
     }
 
