@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Sparkle
 
 final class SparkleUpdater: ObservableObject {
@@ -9,6 +10,7 @@ final class SparkleUpdater: ObservableObject {
 
     @Published var isUpdateAvailable = false
     @Published var isUpdateReadyToRestart = false
+    @Published var didDownloadFail = false
 
     private init() {
         let delegate = UpdaterDelegate()
@@ -31,6 +33,13 @@ final class SparkleUpdater: ObservableObject {
         delegate.installUpdateBlock?()
     }
 
+    /// 静默下载失败时，打开 GitHub Releases 页面让用户手动下载
+    func openGitHubReleases() {
+        if let url = URL(string: "https://github.com/xifandev/KimiCodeBar/releases/") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     // MARK: - Inner Delegate
 
     private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
@@ -40,6 +49,7 @@ final class SparkleUpdater: ObservableObject {
         func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
             DispatchQueue.main.async {
                 self.owner?.isUpdateAvailable = true
+                self.owner?.didDownloadFail = false
             }
         }
 
@@ -53,6 +63,13 @@ final class SparkleUpdater: ObservableObject {
             DispatchQueue.main.async {
                 self.installUpdateBlock = immediateInstallationBlock
                 self.owner?.isUpdateReadyToRestart = true
+                self.owner?.didDownloadFail = false
+            }
+        }
+
+        func updater(_ updater: SPUUpdater, failedToDownloadUpdate item: SUAppcastItem, error: Error) {
+            DispatchQueue.main.async {
+                self.owner?.didDownloadFail = true
             }
         }
     }

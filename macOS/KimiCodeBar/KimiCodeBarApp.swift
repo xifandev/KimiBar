@@ -639,7 +639,7 @@ struct AppUpdateRow: View {
     @State private var isHovered = false
 
     private var isClickable: Bool {
-        sparkleUpdater.isUpdateReadyToRestart
+        sparkleUpdater.isUpdateReadyToRestart || sparkleUpdater.didDownloadFail
     }
 
     var body: some View {
@@ -667,9 +667,7 @@ struct AppUpdateRow: View {
         .onHover { isHovered = $0 }
         .cursor(isClickable ? .pointingHand : .arrow)
         .onTapGesture {
-            if sparkleUpdater.isUpdateReadyToRestart {
-                sparkleUpdater.restartToInstallUpdate()
-            }
+            handleTap()
         }
     }
 
@@ -679,10 +677,24 @@ struct AppUpdateRow: View {
             LText("重启完成更新")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.green)
-        } else if sparkleUpdater.isUpdateAvailable || model.pendingAppUpdateVersion != nil {
+        } else if sparkleUpdater.didDownloadFail {
             LText("下载新版本")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.orange)
+        } else if sparkleUpdater.isUpdateAvailable || model.pendingAppUpdateVersion != nil {
+            HStack(spacing: 6) {
+                Text(appVersion())
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.kimiTextSecondary)
+
+                LText("发现新版本")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
         } else {
             HStack(spacing: 6) {
                 Text(appVersion())
@@ -697,6 +709,14 @@ struct AppUpdateRow: View {
                     .background(Color.kimiTextPrimary.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             }
+        }
+    }
+
+    private func handleTap() {
+        if sparkleUpdater.isUpdateReadyToRestart {
+            sparkleUpdater.restartToInstallUpdate()
+        } else if sparkleUpdater.didDownloadFail {
+            sparkleUpdater.openGitHubReleases()
         }
     }
 }
