@@ -4434,33 +4434,17 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     func stopKimiServer() async {
-        // 直接请求服务的 shutdown 接口优雅退出：`kimi web kill` 只能处理它自己
-        // 跟踪的实例，Terminal 前台启动的 kimi web 不在其列表中，会成为空操作。
-        await requestKimiServerShutdown(port: 58627)
-
-        // 兜底：清理它自己跟踪的实例
+        // kimi web kill all：先 POST /api/v1/shutdown 优雅退出，再 SIGTERM/SIGKILL，停止全部实例
         _ = await runKimiCommand(arguments: ["web", "kill", "all"])
 
         // 清理可能残留的旧 LaunchAgent，避免 KeepAlive 反复拉起进程
         let manager = KimiWebLaunchAgentManager.shared
         await manager.uninstall()
 
-        // 轮询等待端口真正关闭（最多 5 秒）
-        for _ in 0..<5 {
-            if await fetchKimiServerVersion(port: 58627) == nil { break }
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-        }
+        // 给优雅退出一点时间
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
 
         await refreshKimiServerState()
-    }
-
-    /// 请求本地 Kimi Web 优雅退出
-    private func requestKimiServerShutdown(port: Int) async {
-        guard let url = URL(string: "http://127.0.0.1:\(port)/api/v1/shutdown") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 5
-        _ = try? await URLSession.shared.data(for: request)
     }
 
     private func detectKimiServerState() async -> KimiServerState {
