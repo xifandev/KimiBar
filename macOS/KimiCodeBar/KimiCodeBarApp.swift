@@ -717,7 +717,6 @@ struct KimiMenu: View {
                     },
                     onStart: {
                         kimiServerOperation = .starting
-                        dismissMenuBarPanel()
                         Task {
                             await model.startKimiServer()
                             await MainActor.run { kimiServerOperation = .none }
