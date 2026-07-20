@@ -1894,6 +1894,14 @@ func parseChineseChangelogEntries(_ text: String, maxCount: Int = 10) -> [(versi
     return entries
 }
 
+/// 从中文 changelog 中抓取指定版本的 release notes。
+/// 版本号会先做 normalize，因此 "0.28.0" 与 "v0.28.0" 都能匹配。
+func fetchKimiReleaseNotes(forVersion version: String) async -> String? {
+    let normalizedTarget = normalizeVersion(version)
+    let entries = await fetchChineseChangelogEntries(maxCount: 20)
+    return entries.first { normalizeVersion($0.version) == normalizedTarget }?.notes
+}
+
 func normalizeVersion(_ version: String) -> String {
     let trimmed = version.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -4535,14 +4543,18 @@ final class KimiCodeBarModel: ObservableObject {
             return
         }
 
+        let currentNormalized = normalizeVersion(current)
+        let latestNormalized = normalizeVersion(latest)
+        let hasUpdate = compareVersions(currentNormalized, latestNormalized) == .orderedAscending
+
+        // 检测到有新版本时，按版本号精确抓取对应 release notes，避免缓存与版本不匹配
+        let notes = hasUpdate ? await fetchKimiReleaseNotes(forVersion: latest) : nil
+
         await MainActor.run {
             cachedKimiLatestVersion = latest
             isCheckingUpdate = false
 
-            let currentNormalized = normalizeVersion(current)
-            let latestNormalized = normalizeVersion(latest)
-
-            if compareVersions(currentNormalized, latestNormalized) == .orderedAscending {
+            if hasUpdate {
                 // 如果还在"稍后提醒"的延迟期内，不设置 pendingUpdateVersion，也不发通知
                 let now = Date().timeIntervalSince1970
                 guard now >= snoozedKimiUpdateUntil else {
@@ -4552,7 +4564,8 @@ final class KimiCodeBarModel: ObservableObject {
                 // 避免重复通知：只有首次发现该版本时才发送通知
                 if pendingUpdateVersion != latest {
                     pendingUpdateVersion = latest
-                    pendingReleaseNotes = cachedKimiReleaseNotes.isEmpty ? nil : cachedKimiReleaseNotes
+                    cachedKimiReleaseNotes = notes ?? ""
+                    pendingReleaseNotes = notes
                     snoozedKimiUpdateUntil = 0
                     sendUpdateNotification(version: latest)
                 }
