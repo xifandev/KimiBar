@@ -4448,8 +4448,20 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     private func detectKimiServerState() async -> KimiServerState {
-        // Kimi CLI 0.28 起废弃 kimi server 命令树，改用 kimi web ps --json
-        // server 未运行时返回空 servers 数组或退出码非 0，均走 stopped 分支
+        // 直接探测本地端口判定运行状态：`kimi web ps` 只跟踪它自己拉起的实例，
+        // 通过 Terminal 前台启动的 kimi web 不在其列表中，会被误判为已停止。
+        let port = 58627
+        guard let version = await fetchKimiServerVersion(port: port) else {
+            return KimiServerState(
+                status: .stopped,
+                version: LanguageManager.tr("未检测到"),
+                port: port,
+                connections: 0
+            )
+        }
+
+        // 连接数尽量从 kimi web ps 补充；ps 看不到 Terminal 前台启动的实例时记 0
+        var connections = 0
         let psResult = await runKimiCommand(arguments: ["web", "ps", "--json"])
 
         struct PsResponse: Decodable {
@@ -4461,31 +4473,23 @@ final class KimiCodeBarModel: ObservableObject {
         }
 
         if psResult.exitCode == 0,
-           !psResult.output.isEmpty,
            let data = psResult.output.data(using: .utf8),
-           let resp = try? JSONDecoder().decode(PsResponse.self, from: data),
-           !resp.servers.isEmpty {
-            let connections = resp.servers.reduce(0) { $0 + $1.connections.count }
-            let version = await detectKimiServerVersion(port: 58627)
-            return KimiServerState(
-                status: .running,
-                version: version,
-                port: 58627,
-                connections: connections
-            )
+           let resp = try? JSONDecoder().decode(PsResponse.self, from: data) {
+            connections = resp.servers.reduce(0) { $0 + $1.connections.count }
         }
 
         return KimiServerState(
-            status: .stopped,
-            version: LanguageManager.tr("未检测到"),
-            port: 58627,
-            connections: 0
+            status: .running,
+            version: version,
+            port: port,
+            connections: connections
         )
     }
 
-    private func detectKimiServerVersion(port: Int = 58627) async -> String {
+    /// 探测本地 Kimi Web 服务，返回 server 版本号；端口不可达（服务未运行）时返回 nil
+    private func fetchKimiServerVersion(port: Int) async -> String? {
         guard let url = URL(string: "http://127.0.0.1:\(port)/api/v1/meta") else {
-            return LanguageManager.tr("未检测到")
+            return nil
         }
 
         struct MetaResponse: Decodable {
@@ -4499,13 +4503,13 @@ final class KimiCodeBarModel: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                return LanguageManager.tr("未检测到")
+                return nil
             }
             let meta = try JSONDecoder().decode(MetaResponse.self, from: data)
             let version = meta.data.server_version.trimmingCharacters(in: .whitespacesAndNewlines)
             return version.isEmpty ? LanguageManager.tr("未检测到") : version
         } catch {
-            return LanguageManager.tr("未检测到")
+            return nil
         }
     }
 
