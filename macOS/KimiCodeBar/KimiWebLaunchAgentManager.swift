@@ -14,6 +14,16 @@ final class KimiWebLaunchAgentManager: @unchecked Sendable {
 
     private let label = "com.kimicodebar.kimiweb"
 
+    /// launchd 用户域目标，例如 "gui/501"。
+    private var domainTarget: String {
+        "gui/\(getuid())"
+    }
+
+    /// 完整服务目标，例如 "gui/501/com.kimicodebar.kimiweb"。
+    private var serviceTarget: String {
+        "\(domainTarget)/\(label)"
+    }
+
     private var launchAgentsDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents", isDirectory: true)
@@ -38,19 +48,17 @@ final class KimiWebLaunchAgentManager: @unchecked Sendable {
 
     /// 写入 plist 并加载到 launchd。
     func install() async {
-        await Task.detached(priority: .utility) {
+        await Task.detached(priority: .utility) { () -> Void in
             self.ensureDirectories()
             guard let kimiPath = self.findKimiPath() else { return }
 
-            // 若 plist 已存在且已加载，先卸载，避免 load 时报 "already loaded"
-            if FileManager.default.fileExists(atPath: self.plistURL.path) {
-                self.unload()
-            }
+            // 若服务已存在，先 bootout，避免 bootstrap 时报 "already bootstrapped"
+            self.runLaunchctl(arguments: ["bootout", self.serviceTarget])
 
             let plist = self.generatePlist(kimiPath: kimiPath)
             try? plist.write(to: self.plistURL, options: .atomic)
 
-            self.runLaunchctl(arguments: ["load", self.plistURL.path])
+            self.runLaunchctl(arguments: ["bootstrap", self.domainTarget, self.plistURL.path])
         }.value
     }
 
@@ -68,15 +76,10 @@ final class KimiWebLaunchAgentManager: @unchecked Sendable {
         }.value
     }
 
-    /// 从 launchd 卸载服务。
-    func unload() {
-        runLaunchctl(arguments: ["unload", plistURL.path])
-    }
-
-    /// 卸载并删除 plist 文件。
+    /// 从 launchd 卸载并删除 plist 文件。
     func uninstall() async {
-        await Task.detached(priority: .utility) {
-            self.unload()
+        await Task.detached(priority: .utility) { () -> Void in
+            self.runLaunchctl(arguments: ["bootout", self.serviceTarget])
             try? FileManager.default.removeItem(at: self.plistURL)
         }.value
     }
@@ -84,8 +87,8 @@ final class KimiWebLaunchAgentManager: @unchecked Sendable {
     /// 检查当前是否已加载。
     func isLoaded() async -> Bool {
         await Task.detached(priority: .utility) {
-            let result = self.runLaunchctl(arguments: ["list", self.label])
-            return result.exitCode == 0 && result.output.contains(self.label)
+            let result = self.runLaunchctl(arguments: ["print", self.serviceTarget])
+            return result.exitCode == 0
         }.value
     }
 
