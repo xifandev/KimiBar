@@ -4377,8 +4377,23 @@ final class KimiCodeBarModel: ObservableObject {
     }
 
     func openKimiWeb() {
-        let url = URL(string: "http://127.0.0.1:\(kimiServerState.port)/") ?? URL(string: "http://127.0.0.1:58627/")!
-        NSWorkspace.shared.open(url)
+        let port = kimiServerState.port
+        var urlString = "http://127.0.0.1:\(port)/"
+
+        // kimi web 默认开启 bearer token 鉴权，URL 需带 #token=xxx 才能访问 Web UI
+        // token 持久化在 ~/.kimi-code/server.token（kimi web rotate-token 会更新此文件）
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let tokenPath = "\(home)/.kimi-code/server.token"
+        if let token = try? String(contentsOfFile: tokenPath, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !token.isEmpty,
+           let encoded = token.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed) {
+            urlString = "http://127.0.0.1:\(port)/#token=\(encoded)"
+        }
+
+        if let url = URL(string: urlString) {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func restartKimiServer() async {
