@@ -669,20 +669,28 @@ struct AppUpdateRow: View {
 
     @ViewBuilder
     private func rightContent() -> some View {
-        if sparkleUpdater.didDownloadFail {
-            LText("下载新版本")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.orange)
-        } else if sparkleUpdater.isUpdateAvailable || model.pendingAppUpdateVersion != nil {
-            LText("发现新版本")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.orange)
-        } else {
-            HStack(spacing: 6) {
-                Text(appVersion())
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.kimiTextSecondary)
+        HStack(spacing: 6) {
+            Text(appVersion())
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(.kimiTextSecondary)
 
+            if sparkleUpdater.didDownloadFail {
+                LText("下载新版本")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else if sparkleUpdater.isUpdateAvailable || model.pendingAppUpdateVersion != nil {
+                LText("发现新版本")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
                 LText("当前最新")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.kimiTextTertiary)
