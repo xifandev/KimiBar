@@ -157,7 +157,7 @@ jobs:
             --apple-id "$NOTARIZATION_APPLE_ID" \
             --team-id "$NOTARIZATION_TEAM_ID" \
             --password "$NOTARIZATION_PASSWORD" \
-            --wait --timeout 3600 2>&1 | tee notary_output.txt
+            --wait --timeout 3600 --no-progress 2>&1 | tee notary_output.txt
           EXIT_CODE=${PIPESTATUS[0]}
           set +o pipefail
           set -e
