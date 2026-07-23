@@ -31,15 +31,29 @@ jobs:
           mkdir -p sparkle-tools
           cp bin/generate_appcast sparkle-tools/
 
+      - name: Setup signing
+        env:
+          DEVELOPER_ID_APPLICATION_CERTIFICATE: ${{ secrets.DEVELOPER_ID_APPLICATION_CERTIFICATE }}
+          DEVELOPER_ID_APPLICATION_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # 创建 CI 临时钥匙串并导入 Developer ID 证书
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 1200 build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          echo "$DEVELOPER_ID_APPLICATION_CERTIFICATE" | base64 --decode -o developer_id.p12
+          security import developer_id.p12 -k build.keychain -P "$DEVELOPER_ID_APPLICATION_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychain -d user -s build.keychain login.keychain
+
       - name: Build KimiCodeBar
         run: |
           xcodebuild \
             -project macOS/KimiCodeBar.xcodeproj \
             -target KimiCodeBar \
             -configuration Release \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_IDENTITY="Developer ID Application" \
+            DEVELOPMENT_TEAM="Z2L7QJW4R7" \
             CODE_SIGNING_REQUIRED=YES \
-            ENABLE_HARDENED_RUNTIME=NO \
             BUILD_DIR="$(pwd)/macOS/build"
 
       - name: Package
@@ -63,6 +77,21 @@ jobs:
             --no-internet-enable \
             "${DMG_NAME}" \
             "KimiCodeBar.app"
+
+      - name: Sign app and disk image
+        run: |
+          codesign --force --deep --sign "Developer ID Application: Shandong Gaite Network Co., Ltd. (Z2L7QJW4R7)" --options runtime dist/KimiCodeBar.app
+          codesign --sign "Developer ID Application: Shandong Gaite Network Co., Ltd. (Z2L7QJW4R7)" --options runtime dist/KimiCodeBar-*-macOS.dmg
+
+      - name: Notarize
+        env:
+          NOTARIZATION_APPLE_ID: ${{ secrets.NOTARIZATION_APPLE_ID }}
+          NOTARIZATION_TEAM_ID: ${{ secrets.NOTARIZATION_TEAM_ID }}
+          NOTARIZATION_PASSWORD: ${{ secrets.NOTARIZATION_PASSWORD }}
+        run: |
+          DMG_PATH=$(ls dist/KimiCodeBar-*-macOS.dmg | head -1)
+          xcrun notarytool submit "$DMG_PATH" --apple-id "$NOTARIZATION_APPLE_ID" --team-id "$NOTARIZATION_TEAM_ID" --password "$NOTARIZATION_PASSWORD" --wait
+          xcrun stapler staple "$DMG_PATH"
 
       - name: Generate Appcast
         env:
