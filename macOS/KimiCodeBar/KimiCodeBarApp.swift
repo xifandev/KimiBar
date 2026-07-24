@@ -3415,7 +3415,7 @@ struct PanelCustomSettingsView: View {
                         // 置灰禁用展示，保留用户历史开关状态但不可操作。
                         SettingsCardRow(
                             title: languageManager.tr("Kimi Web 卡片"),
-                            subtitle: languageManager.tr("已弃用。官方砍掉了 server 服务，临时启用请使用官方命令 “kimi web”")
+                            subtitle: languageManager.tr("官方砍掉了 server 服务，临时弃用。")
                         ) {
                             Toggle("", isOn: $model.showKimiServerCard)
                                 .labelsHidden()
